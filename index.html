@@ -66,6 +66,21 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
   .pbtn{background:#241d18; border:1px solid var(--line); color:var(--dim); cursor:pointer;
     padding:7px 10px; border-radius:3px; font:inherit; font-size:10px; letter-spacing:.08em; transition:.12s;}
   .pbtn:hover{border-color:var(--rust2); color:var(--ink);}
+  #slotCount{color:#6d6157; letter-spacing:0;}
+  #savedRow{display:flex; flex-wrap:wrap; gap:5px; max-width:330px;}
+  #savedRow .empty{font-size:10px; color:#6d6157; letter-spacing:.06em; padding:4px 0;}
+  .slot{display:flex; align-items:stretch; border:1px solid var(--line); border-radius:3px; overflow:hidden;}
+  .slot b{background:#241d18; color:var(--dim); cursor:pointer; padding:7px 9px;
+    font-size:10px; font-weight:400; letter-spacing:.06em; transition:.12s;}
+  .slot b:hover{background:var(--rust); color:#fff;}
+  .slot i{background:#1d1815; color:#6d6157; cursor:pointer; padding:7px 6px; font-style:normal;
+    font-size:10px; border-left:1px solid var(--line); transition:.12s;}
+  .slot i:hover{background:var(--bad); color:#fff;}
+  #saveBar{display:flex; gap:5px; margin-top:7px;}
+  #saveName{flex:1; background:#181310; border:1px solid var(--line); color:var(--ink);
+    border-radius:3px; padding:6px 8px; font:inherit; font-size:10px; letter-spacing:.06em; outline:none;}
+  #saveName:focus{border-color:var(--rust2);}
+  #saveName::placeholder{color:#5c5148;}
 
   #gGo{position:absolute; bottom:14px; right:14px; pointer-events:auto;
     background:var(--rust); border:1px solid var(--rust2); color:#fff; cursor:pointer;
@@ -85,6 +100,12 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
   #times{position:absolute; top:14px; left:50%; transform:translateX(-50%); text-align:center; padding:9px 22px;}
   #clock{font-size:26px; font-weight:800; line-height:1;}
   #best{font-size:10px; letter-spacing:.16em; color:var(--dim); margin-top:4px;}
+  #lapRow{display:flex; gap:14px; justify-content:center; margin-top:6px; padding-top:6px;
+    border-top:1px solid var(--line); font-size:11px; letter-spacing:.14em; font-weight:700;}
+  #lapNum{color:var(--ink);} #place{color:var(--rust2);}
+  #lapFlash{position:absolute; top:32%; left:50%; transform:translate(-50%,-50%);
+    font-size:38px; font-weight:800; letter-spacing:.16em; color:var(--rust2); opacity:0;
+    text-shadow:0 0 30px rgba(224,118,44,.6); pointer-events:none;}
   #sect{position:absolute; top:14px; left:14px; padding:9px 13px; font-size:11px; letter-spacing:.12em;}
   #sectName{color:var(--rust2); font-weight:700;}
   #sectTest{color:var(--dim); font-size:10px; letter-spacing:.03em; margin-top:3px;}
@@ -144,7 +165,20 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
     color:#f0c88a; text-shadow:0 0 40px rgba(224,118,44,.35), 0 4px 0 rgba(0,0,0,.5);}
   #introTag{font-size:11px; letter-spacing:.42em; margin-top:10px; color:var(--rust2);}
   #introBlurb{margin-top:26px; font-size:12px; line-height:2; color:#cbbaa6; letter-spacing:.04em;}
-  #introBtns{margin-top:32px; display:flex; gap:10px;}
+  #trackPick{margin-top:26px;}
+  #trackPick h2{font-size:9px; letter-spacing:.3em; color:#7d6f60; margin-bottom:8px;}
+  #trackList{display:flex; gap:8px;}
+  .tcard{background:rgba(29,24,21,.8); border:1px solid var(--line); border-radius:4px;
+    padding:11px 13px; cursor:pointer; transition:.14s; min-width:172px; text-align:left;
+    font:inherit; color:var(--dim);}
+  .tcard:hover:not(.locked){border-color:var(--rust2); background:rgba(45,34,26,.9);}
+  .tcard.on{border-color:var(--rust2); background:rgba(80,40,16,.55);}
+  .tcard.locked{opacity:.4; cursor:not-allowed;}
+  .tcard .tn{font-size:12px; font-weight:800; letter-spacing:.14em; color:var(--ink);}
+  .tcard.on .tn{color:var(--rust2);}
+  .tcard .tm{font-size:9px; letter-spacing:.14em; color:#7d6f60; margin-top:4px;}
+  .tcard .tb{font-size:9px; line-height:1.6; color:#9b8d7e; margin-top:7px;}
+  #introBtns{margin-top:26px; display:flex; gap:10px;}
   #introBtns button{background:var(--rust); border:1px solid var(--rust2); color:#fff; cursor:pointer;
     padding:16px 40px; border-radius:4px; font:inherit; font-size:13px; font-weight:800;
     letter-spacing:.24em; transition:.14s;}
@@ -197,6 +231,12 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
     <div id="gPresets" class="panel">
       <h2>SCRAP HEAP</h2>
       <div id="presetRow"></div>
+      <h2 style="margin-top:12px">YOUR GARAGE <span id="slotCount"></span></h2>
+      <div id="savedRow"></div>
+      <div id="saveBar">
+        <input id="saveName" type="text" maxlength="18" placeholder="name this thing" spellcheck="false">
+        <button id="btnSave" class="pbtn">SAVE</button>
+      </div>
     </div>
     <div id="gHelp">
       <kbd>CLICK</kbd> place · <kbd>RIGHT-CLICK</kbd> remove · <kbd>DRAG</kbd> orbit · <kbd>SCROLL</kbd> zoom · <kbd>1-4</kbd> part
@@ -206,7 +246,12 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
 
   <div id="hud">
     <div id="sect" class="panel"><div id="sectName">—</div><div id="sectTest"></div></div>
-    <div id="times" class="panel"><div id="clock">0.00</div><div id="best">BEST —</div></div>
+    <div id="times" class="panel">
+      <div id="clock">0.00</div>
+      <div id="best">BEST —</div>
+      <div id="lapRow"><span id="lapNum">LAP 1/3</span><span id="place">P1</span></div>
+    </div>
+    <div id="lapFlash"></div>
     <button id="back">◀ GARAGE</button>
     <div id="speedo"><div id="spd">0</div><div id="spdu">KM/H</div></div>
     <div id="drift">
@@ -246,11 +291,14 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
         Nothing about how it drives is decided by a stat. It's decided by<br>
         where you put the weight.
       </div>
+      <div id="trackPick">
+        <h2>PICK A ROAD</h2>
+        <div id="trackList"></div>
+      </div>
       <div id="introBtns">
         <button id="btnDrive">DRIVE</button>
         <button id="btnSettings" class="alt">SETTINGS</button>
       </div>
-      <div id="introFoot"><span id="introTrack">THE OLD 47</span> · <span id="introSub">MERCY COUNTY</span></div>
     </div>
   </div>
 
@@ -384,6 +432,7 @@ const S = {
   mode:'garage', tool:'frame',
   cells:new Map(),
   raceT:0, bestT:null, countT:0,
+  lap:1, lapStart:0, lapTimes:[], bestLap:null, lapFlash:0, place:1,
   prog:0, lastProg:0, cps:[false,false,false], lastCpIdx:0,
   speed:0, dead:false, deadT:0, stuckT:0, sectionIdx:-1, offRoad:0, shake:0,
   stats:null, steer:0, throttle:0, brake:0, thr:0, handbrake:false, lastCd:9,
@@ -395,6 +444,9 @@ const S = {
 };
 const key = (x,y,z) => x+','+y+','+z;
 const unkey = k => k.split(',').map(Number);
+// Declared up here on purpose: several module-level blocks below wire up DOM
+// handlers at load time, and a const arrow further down would be in its TDZ.
+const el = id => document.getElementById(id);
 
 /* ================================================================= SETTINGS */
 const SET_DEFAULTS = { steer:1.0, shake:1.0, fx:'high', camFx:true, master:0.9, sfx:0.85 };
@@ -832,8 +884,21 @@ const SECTIONS = [
   { a:0.64, b:0.84, name:'THE OFF-CAMBER', test:'tall builds roll' },
   { a:0.84, b:1.00, name:'MERCY',          test:'what\'s left of the town' },
 ];
-const TRACK_NAME = 'THE OLD 47';
-const TRACK_SUB  = 'MERCY COUNTY · 850m · ONE LAP';
+const LAPS = 3;
+const OPPONENTS = 3;
+
+// Track registry. One entry today — the selector is the seam, so adding a
+// second track is a data change plus making the world build a function of it
+// (the heightfield/road/props are currently built once at module load against
+// the CP list above).
+const TRACKS = [
+  { id:'old47', name:'THE OLD 47', sub:'MERCY COUNTY', len:'850m', laps:LAPS,
+    blurb:'A county road nobody maintains, through a town nobody lives in.', ready:true },
+  { id:'saltpan', name:'THE SALT PAN', sub:'LOCKED', len:'—', laps:LAPS,
+    blurb:'Something flatter, faster, and with less to hide behind.', ready:false },
+];
+let TRACK = TRACKS[0];
+const TRACK_NAME = TRACKS[0].name;
 const HALFW = 5.2, SHOULDER = 5.5, NSAMP = 480;
 
 const curve = new THREE.CatmullRomCurve3(CP.map(([x,z]) => new THREE.Vector3(x,0,z)), true, 'catmullrom', 0.5);
@@ -1525,11 +1590,11 @@ function rebuildMeshes(){
 }
 
 /* ------------------------------------------- stats: mass, CoM, inertia etc */
-function computeStats(){
+function computeStats(cells = S.cells){
   let mass = 0;
   const com = new THREE.Vector3();
   const blocks = [];
-  for (const [k, type] of S.cells) {
+  for (const [k, type] of cells) {
     const [ix,iy,iz] = unkey(k);
     const m = PARTS[type].mass, p = cellPos(ix,iy,iz);
     blocks.push({ k, type, m, p });
@@ -1618,38 +1683,46 @@ function renderStats(){
 function refresh(){ S.stats = computeStats(); rebuildMeshes(); renderStats(); }
 
 /* ------------------------------------------------------------- the vehicle */
+// The player and every opponent are the same thing. `player` and the four
+// aliases below keep all the existing single-car code working unchanged.
+let player = null, opps = [];
 let vehicle = null, chassisBody = null, chassisGroup = null, wheelMeshes = [], linkages = [];
 
-function buildVehicle(){
-  if (vehicle) { vehicle.removeFromWorld(world); vehicle = null; }
-  if (chassisGroup) { scene.remove(chassisGroup); chassisGroup = null; }
-  wheelMeshes.forEach(m => scene.remove(m));
-  linkages.forEach(l => { scene.remove(l.shock); scene.remove(l.arm); });
-  wheelMeshes = []; linkages = [];
+function disposeCar(car){
+  if (!car) return;
+  car.vehicle.removeFromWorld(world);
+  scene.remove(car.group);
+  car.wheels.forEach(m => scene.remove(m));
+  car.links.forEach(l => { scene.remove(l.shock); scene.remove(l.arm); });
+}
 
-  const st = S.stats;
-  chassisBody = new CANNON.Body({ mass:st.mass });
+function makeCar(st, opts = {}){
+  const car = { st, isPlayer: !!opts.player, tint: opts.tint || null,
+                pace: opts.pace || 1, lane: opts.lane || 0,
+                steer: 0, prog: 0, lastProg: 0, lap: 1,
+                lastCpIdx: 0, stuckT: 0, wheels: [], links: [] };
+  const body = new CANNON.Body({ mass:st.mass });
   const half = T.cell*0.48;
   for (const b of st.blocks) {
     if (b.type === 'wheel') continue;                     // wheels are vehicle wheels, not chassis shapes
     const off = b.p.clone().sub(st.com);                  // shapes hang off the CoM origin
-    chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(half,half,half)), new CANNON.Vec3(off.x,off.y,off.z));
+    body.addShape(new CANNON.Box(new CANNON.Vec3(half,half,half)), new CANNON.Vec3(off.x,off.y,off.z));
   }
-  if (!chassisBody.shapes.length) chassisBody.addShape(new CANNON.Box(new CANNON.Vec3(half,half,half)));
-  chassisBody.updateMassProperties();
+  if (!body.shapes.length) body.addShape(new CANNON.Box(new CANNON.Vec3(half,half,half)));
+  body.updateMassProperties();
   // Override cannon's AABB guess with the real thing.
-  chassisBody.inertia.set(st.I.x, st.I.y, st.I.z);
-  chassisBody.invInertia.set(1/st.I.x, 1/st.I.y, 1/st.I.z);
-  chassisBody.updateInertiaWorld(true);
-  chassisBody.angularDamping = 0.12;
+  body.inertia.set(st.I.x, st.I.y, st.I.z);
+  body.invInertia.set(1/st.I.x, 1/st.I.y, 1/st.I.z);
+  body.updateInertiaWorld(true);
+  body.angularDamping = 0.12;
 
-  vehicle = new CANNON.RaycastVehicle({
-    chassisBody, indexRightAxis:0, indexUpAxis:1, indexForwardAxis:2,
+  const veh = new CANNON.RaycastVehicle({
+    chassisBody: body, indexRightAxis:0, indexUpAxis:1, indexForwardAxis:2,
   });
   const minWheelY = Math.min(...st.wheels.map(w => w.p.y - st.com.y));
   for (const w of st.wheels) {
     const off = w.p.clone().sub(st.com);
-    vehicle.addWheel({
+    veh.addWheel({
       radius: T.wheelR,
       directionLocal: new CANNON.Vec3(0,-1,0),
       axleLocal: new CANNON.Vec3(-1,0,0),
@@ -1666,38 +1739,45 @@ function buildVehicle(){
       customSlidingRotationalSpeed: -30,
       useCustomSlidingRotationalSpeed: true,
     });
-    vehicle.wheelInfos[vehicle.wheelInfos.length-1].userData = {
+    veh.wheelInfos[veh.wheelInfos.length-1].userData = {
       steers: st.steerKeys.has(w.k),
       rear: (w.p.z - st.com.z) <= 0.05,      // the handbrake only drags these
     };
   }
-  vehicle.addToWorld(world);
-  chassisBody.userData = { minWheelY };
+  veh.addToWorld(world);
+  body.userData = { minWheelY, car };
+  car.body = body; car.vehicle = veh;
 
-  // Impact feedback. getImpactVelocityAlongNormal is signed, and the contact's
-  // ri/rj are relative to bi/bj, so which one is the chassis decides the maths.
-  chassisBody.addEventListener('collide', e => {
-    const imp = Math.abs(e.contact.getImpactVelocityAlongNormal());
-    if (imp < 2.2) return;
-    const chassisIsA = e.contact.bi === chassisBody;
-    const b = chassisIsA ? e.contact.bi : e.contact.bj;
-    const r = chassisIsA ? e.contact.ri : e.contact.rj;
-    const px = b.position.x + r.x, py = b.position.y + r.y, pz = b.position.z + r.z;
-    const power = Math.min(1, imp/16);
-    spawnSparks(px, py, pz, 3 + ((power*13)|0), power);
-    S.shake = Math.max(S.shake, power);
-    Sound.thud(power);
-  });
+  // Impact feedback — player only; opponents banging about shouldn't shake you.
+  if (car.isPlayer) {
+    body.addEventListener('collide', e => {
+      const imp = Math.abs(e.contact.getImpactVelocityAlongNormal());
+      if (imp < 2.2) return;
+      const chassisIsA = e.contact.bi === body;
+      const b = chassisIsA ? e.contact.bi : e.contact.bj;
+      const r = chassisIsA ? e.contact.ri : e.contact.rj;
+      const px = b.position.x + r.x, py = b.position.y + r.y, pz = b.position.z + r.z;
+      const power = Math.min(1, imp/16);
+      spawnSparks(px, py, pz, 3 + ((power*13)|0), power);
+      S.shake = Math.max(S.shake, power);
+      Sound.thud(power);
+    });
+  }
 
-  chassisGroup = new THREE.Group();
+  const group = new THREE.Group();
   for (const b of st.blocks) {
     if (b.type === 'wheel') continue;
-    const m = new THREE.Mesh(partGeo, matFor(b.type, b.k));
+    let mat = matFor(b.type, b.k);
+    // Opponents get a paint job so you can tell who's who at a glance.
+    if (car.tint && b.type !== 'engine') mat = car.tint[cellHash(b.k) % car.tint.length];
+    const m = new THREE.Mesh(partGeo, mat);
     m.position.copy(b.p.clone().sub(st.com));
     m.castShadow = true;
-    chassisGroup.add(m);
+    group.add(m);
   }
-  scene.add(chassisGroup);
+  scene.add(group);
+  car.group = group;
+
   for (const w of st.wheels) {
     // Wheel = tyre + rim as a group, so the rim can be metal.
     const g = new THREE.Group();
@@ -1705,7 +1785,7 @@ function buildVehicle(){
     const rim = new THREE.Mesh(rimGeo, rimMat);
     tyre.castShadow = true; rim.castShadow = true;
     g.add(tyre, rim);
-    scene.add(g); wheelMeshes.push(g);
+    scene.add(g); car.wheels.push(g);
 
     // The linkage is the whole point: a shock down from the mount and an arm
     // inboard to the hub. Without these the wheels just hover beside the hull.
@@ -1719,43 +1799,165 @@ function buildVehicle(){
     // which means a strut drawn there is entirely inside the tyre. Route the
     // shock diagonally from the chassis TOP edge instead: it crosses the gap
     // between hull and wheel and rises clear of the tread, where you can see it.
-    linkages.push({
+    car.links.push({
       shock, arm,
       mount: new THREE.Vector3(sx * Math.min(Math.abs(off.x), st.bodyHalfW*0.8), st.bodyTop - 0.1, off.z),
       root:  new THREE.Vector3(sx * st.bodyHalfW * 0.3, off.y, off.z),
     });
   }
+  return car;
 }
 
-function spawnAt(sampleIdx){
-  const i = ((sampleIdx % NSAMP) + NSAMP) % NSAMP;
-  const p = TR.pts[i], tan = TR.tans[i];
-  const surf = roadElev(i/NSAMP, TR.cum[i]);
-  const y = surf + T.wheelR - chassisBody.userData.minWheelY + 0.15;
-  chassisBody.position.set(p.x, y, p.z);
-  chassisBody.velocity.setZero();
-  chassisBody.angularVelocity.setZero();
-  chassisBody.quaternion.setFromEuler(0, Math.atan2(tan.x, tan.z), 0);
-  chassisBody.wakeUp();
-  for (let i2 = 0; i2 < vehicle.wheelInfos.length; i2++) {
-    vehicle.setBrake(0, i2);
-    vehicle.applyEngineForce(0, i2);
-    vehicle.wheelInfos[i2].suspensionLength = T.suspRest;
+// Opponent paint. Rust-family so they belong, distinct enough to read apart.
+const OPP_TINT = [
+  [0x4a6b7a, 0x3d5866, 0x577f90].map(c => new THREE.MeshStandardMaterial({ color:c, roughness:0.88, metalness:0.34, flatShading:true })),
+  [0x6b5a2a, 0x7d6a33, 0x5a4b22].map(c => new THREE.MeshStandardMaterial({ color:c, roughness:0.88, metalness:0.34, flatShading:true })),
+  [0x5e3a4a, 0x6f4657, 0x4d2f3d].map(c => new THREE.MeshStandardMaterial({ color:c, roughness:0.88, metalness:0.34, flatShading:true })),
+];
+
+function buildVehicle(){
+  disposeCar(player); player = null;
+  opps.forEach(disposeCar); opps = [];
+
+  player = makeCar(S.stats, { player:true });
+  // Aliases so every existing single-car reference still resolves.
+  vehicle = player.vehicle; chassisBody = player.body; chassisGroup = player.group;
+  wheelMeshes = player.wheels; linkages = player.links;
+
+  // The field: preset machines, so the opposition is built from the same parts
+  // you are and behaves according to the same physics.
+  const names = Object.keys(PRESETS).filter(n => n !== 'THE TOWER');   // it's a joke, not a racer
+  const paces = [0.99, 0.95, 0.91];
+  // Each runs its own line. Without this every car chases the identical
+  // centreline, stacks up, and wedges the field solid.
+  const lanes = [2.8, -2.8, 1.4];
+  for (let i = 0; i < OPPONENTS; i++) {
+    const st = computeStats(PRESETS[names[i % names.length]]());
+    opps.push(makeCar(st, {
+      tint: OPP_TINT[i % OPP_TINT.length], pace: paces[i % paces.length], lane: lanes[i % lanes.length],
+    }));
   }
+}
+
+// lateral = metres off the centreline, so a grid can be staggered across it.
+function spawnCarAt(car, sampleIdx, lateral = 0){
+  const i = ((sampleIdx % NSAMP) + NSAMP) % NSAMP;
+  const p = TR.pts[i], tan = TR.tans[i], nrm = TR.nrms[i];
+  const surf = roadElev(i/NSAMP, TR.cum[i]);
+  const y = surf + T.wheelR - car.body.userData.minWheelY + 0.15;
+  car.body.position.set(p.x + nrm.x*lateral, y, p.z + nrm.z*lateral);
+  car.body.velocity.setZero();
+  car.body.angularVelocity.setZero();
+  car.body.quaternion.setFromEuler(0, Math.atan2(tan.x, tan.z), 0);
+  car.body.wakeUp();
+  for (let i2 = 0; i2 < car.vehicle.wheelInfos.length; i2++) {
+    car.vehicle.setBrake(0, i2);
+    car.vehicle.applyEngineForce(0, i2);
+    car.vehicle.wheelInfos[i2].suspensionLength = T.suspRest;
+  }
+  car.steer = 0; car.stuckT = 0;
+  car.prog = i/NSAMP; car.lastProg = car.prog; car.lastCpIdx = i;
+}
+function spawnAt(sampleIdx){
+  spawnCarAt(player, sampleIdx, 0);
   S.dead = false; S.deadT = 0; S.stuckT = 0;
+}
+// Staggered grid behind the line, player on pole.
+function gridStart(){
+  spawnCarAt(player, 0, 0);
+  player.lap = 1;
+  const perSample = TR.len / NSAMP;                 // metres between samples
+  opps.forEach((c, i) => {
+    const back = Math.round(((i + 1) * 7) / perSample);
+    spawnCarAt(c, -back, (i % 2 ? 1 : -1) * 1.9);
+    // Behind the line, so their sample index wraps to ~475 and prog reads 0.99.
+    // Start them on lap 0 and (lap + prog) still orders the field correctly —
+    // otherwise the standings show you dead last before anyone has moved.
+    c.lap = 0;
+  });
+  updateStandings();
+}
+
+/* --------------------------------------------------------------- opponents */
+// The same physics as you, driven by the track-follower that was built to
+// verify laps headlessly. It brakes for corners and scales its pace, but it
+// gets no grip bonus and no boost — it's driving the machine, not cheating.
+function driveAI(car, dt){
+  const b = car.body, v = car.vehicle, st = car.st;
+  const sp = Math.hypot(b.velocity.x, b.velocity.z);
+  const p = b.position;
+  const near = nearestOnTrack(p.x, p.z);
+
+  car.lastProg = car.prog;
+  car.prog = near.i / NSAMP;
+  if (car.lastProg > 0.85 && car.prog < 0.12) car.lap++;
+  if (near.d < HALFW + SHOULDER) car.lastCpIdx = near.i;
+
+  const look = Math.round(9 + sp*0.45);
+  const li = (near.i + look) % NSAMP;
+  const tp = TR.pts[li], tn = TR.nrms[li];
+  const tx = tp.x + tn.x*car.lane, tz = tp.z + tn.z*car.lane;
+  let err = Math.atan2(tx - p.x, tz - p.z) - yawOf(b);
+  while (err > Math.PI) err -= 2*Math.PI;
+  while (err < -Math.PI) err += 2*Math.PI;
+  const want = clamp(err*2.3, -1, 1);
+  const sharp = Math.abs(want);
+  const thr = (sharp > 0.45 && sp > 17*car.pace) ? 0 : 1;
+  const brk = sharp > 0.85 && sp > 25;
+
+  car.steer += clamp(want - car.steer, -T.steerRate*dt, T.steerRate*dt);
+  const authority = T.maxSteer / (1 + sp*T.steerFalloff);
+  const force = (st.power / Math.max(1, v.wheelInfos.length)) * car.pace;
+
+  for (let i = 0; i < v.wheelInfos.length; i++) {
+    const wi = v.wheelInfos[i], ud = wi.userData || {};
+    v.setSteeringValue(ud.steers ? car.steer*authority : 0, i);
+    v.applyEngineForce(thr ? -force : 0, i);
+    let off = 0;
+    if (wi.isInContact) {
+      const h = wi.raycastResult.hitPointWorld;
+      off = smoothstep(HALFW - 0.4, HALFW + 2.6, nearestOnTrack(h.x, h.z).d);
+    }
+    wi.frictionSlip = T.frictionSlip * lerp(1, T.offRoadGrip, off) * (ud.rear ? T.rearGrip : 1);
+    v.setBrake((brk ? T.brakeForce : 0) + off*T.offRoadBrake, i);
+  }
+
+  const s3 = Math.hypot(b.velocity.x, b.velocity.y, b.velocity.z);
+  if (s3 > 0.1) {
+    const f = T.dragK * st.frontArea * s3 * s3;
+    b.applyForce(new CANNON.Vec3(-b.velocity.x/s3*f, -b.velocity.y/s3*f, -b.velocity.z/s3*f));
+  }
+  // Same anti-spin the player gets outside a drift.
+  const velAng = sp > 2.5 ? Math.atan2(b.velocity.x, b.velocity.z) : yawOf(b);
+  let sl = (velAng - yawOf(b)) * 180/Math.PI;
+  while (sl > 180) sl -= 360; while (sl < -180) sl += 360;
+  const aSl = Math.abs(sl);
+  if (aSl < 90 && aSl > T.driftHold && sp > 6) {
+    const excess = clamp((aSl - T.driftHold)/T.spinCap, 0, 1);
+    b.torque.y -= b.angularVelocity.y * excess * T.antiSpin;
+  }
+  // Unstick itself, same rule as the player.
+  if (upYOf(b) < 0.32 && sp < 1.6) car.stuckT += dt; else car.stuckT = 0;
+  if (car.stuckT > 2.2) spawnCarAt(car, car.lastCpIdx, 0);
+  if (p.y < -25) spawnCarAt(car, car.lastCpIdx, 0);
+}
+
+// Position = furthest along, counting laps. Same rule for everyone.
+// The player's lap/prog live on S (step() owns them, with checkpoint
+// validation); the car object's own fields are only used by driveAI, and for
+// the player they never advance — reading them here scored you a permanent
+// lap 1 and dead last for the entire race.
+function updateStandings(){
+  const all = [{ lap:S.lap, prog:S.prog, me:true }, ...opps.map(c => ({ lap:c.lap, prog:c.prog, me:false }))];
+  all.sort((a, b) => (b.lap + b.prog) - (a.lap + a.prog));
+  S.place = all.findIndex(x => x.me) + 1;
 }
 
 const _uq = new THREE.Quaternion(), _uv = new THREE.Vector3(), _ye = new THREE.Euler();
-function chassisUpY(){
-  if (!chassisBody) return 1;
-  _uv.set(0, 1, 0).applyQuaternion(_uq.copy(chassisBody.quaternion));
-  return _uv.y;
-}
-function bodyYaw(){
-  if (!chassisBody) return 0;
-  _ye.setFromQuaternion(_uq.copy(chassisBody.quaternion), 'YXZ');
-  return _ye.y;
-}
+function upYOf(b){ _uv.set(0,1,0).applyQuaternion(_uq.copy(b.quaternion)); return _uv.y; }
+function yawOf(b){ _ye.setFromQuaternion(_uq.copy(b.quaternion), 'YXZ'); return _ye.y; }
+function chassisUpY(){ return chassisBody ? upYOf(chassisBody) : 1; }
+function bodyYaw(){ return chassisBody ? yawOf(chassisBody) : 0; }
 // Angle between where the nose points and where the car is actually going.
 // This IS the drift — everything else is presentation.
 function slipDeg(){
@@ -1928,9 +2130,71 @@ for (const name in PRESETS) {
   presetRow.appendChild(b);
 }
 
-/* ==================================================================== FLOW */
-const el = id => document.getElementById(id);
+/* --------------------------------------------------------- saved machines */
+// A build is just its cell map, so a slot is [ [key,type], ... ] — small enough
+// that localStorage is fine and a machine can be pasted between browsers.
+const SLOT_MAX = 12;
+const GKEY = 'rattletrap.garage';
+let GARAGE = [];
+try { GARAGE = JSON.parse(localStorage.getItem(GKEY) || '[]'); } catch (e) { GARAGE = []; }
+const saveGarage = () => { try { localStorage.setItem(GKEY, JSON.stringify(GARAGE)); } catch (e) {} };
+const cellsToArr = m => [...m.entries()];
+const arrToCells = a => new Map(a);
 
+function saveCurrent(){
+  const st = S.stats;
+  if (!st || st.empty) return;
+  const input = el('saveName');
+  const name = (input.value || '').trim().slice(0, 18) || 'UNNAMED ' + (GARAGE.length + 1);
+  const body = { name, cells: cellsToArr(S.cells), mass: Math.round(st.mass) };
+  const at = GARAGE.findIndex(g => g.name.toLowerCase() === name.toLowerCase());
+  if (at >= 0) GARAGE[at] = body;                       // same name overwrites, no dupes
+  else {
+    if (GARAGE.length >= SLOT_MAX) { flashWarn('GARAGE FULL — SCRAP ONE FIRST'); return; }
+    GARAGE.push(body);
+  }
+  saveGarage(); input.value = ''; renderGarage();
+  Sound.beep(660, 0.09, 0.13, 'triangle');
+}
+function loadSlot(i){
+  const g = GARAGE[i]; if (!g) return;
+  S.cells = arrToCells(g.cells);
+  el('saveName').value = g.name;
+  refresh();
+  Sound.beep(520, 0.08, 0.12, 'triangle');
+}
+function deleteSlot(i){
+  GARAGE.splice(i, 1); saveGarage(); renderGarage();
+}
+let warnTimer = null;
+function flashWarn(msg){
+  const w = el('warn');
+  w.className = ''; w.textContent = msg;
+  clearTimeout(warnTimer);
+  warnTimer = setTimeout(renderStats, 1800);
+}
+function renderGarage(){
+  const row = el('savedRow');
+  el('slotCount').textContent = '(' + GARAGE.length + '/' + SLOT_MAX + ')';
+  if (!GARAGE.length) { row.innerHTML = '<div class="empty">Nothing saved yet. Build something and name it.</div>'; return; }
+  row.innerHTML = '';
+  GARAGE.forEach((g, i) => {
+    const d = document.createElement('div'); d.className = 'slot';
+    const b = document.createElement('b'); b.textContent = g.name;
+    b.title = g.mass + ' kg — click to load';
+    b.onclick = () => loadSlot(i);
+    const x = document.createElement('i'); x.textContent = '✕'; x.title = 'scrap it';
+    x.onclick = e => { e.stopPropagation(); deleteSlot(i); };
+    d.append(b, x); row.appendChild(d);
+  });
+}
+el('btnSave').onclick = saveCurrent;
+el('saveName').addEventListener('keydown', e => {
+  e.stopPropagation();                                  // don't let 1-4 swap the tool while typing
+  if (e.key === 'Enter') saveCurrent();
+});
+
+/* ==================================================================== FLOW */
 /* ------------------------------------------------------- settings panel UI */
 function buildSettings(){
   const rows = el('setRows');
@@ -1994,9 +2258,7 @@ function showIntro(){
   el('results').style.display = 'none';
   garageRig.visible = false; buildGroup.visible = false;
   trackGroup.visible = true;
-  if (chassisGroup) chassisGroup.visible = false;
-  wheelMeshes.forEach(m => m.visible = false);
-  linkages.forEach(l => { l.shock.visible = false; l.arm.visible = false; });
+  showCars(false);
 }
 
 function showGarage(){
@@ -2008,9 +2270,19 @@ function showGarage(){
   el('results').style.display = 'none';
   garageRig.visible = true; buildGroup.visible = true;
   trackGroup.visible = false;
-  if (chassisGroup) chassisGroup.visible = false;
-  wheelMeshes.forEach(m => m.visible = false);
+  showCars(false);
   refresh();
+  renderGarage();
+}
+// Every car's meshes live in the scene, so the garage and intro have to hide
+// the whole field, not just the player.
+function showCars(on){
+  for (const c of [player, ...opps]) {
+    if (!c) continue;
+    c.group.visible = on;
+    c.wheels.forEach(m => m.visible = on);
+    c.links.forEach(l => { l.shock.visible = on; l.arm.visible = on; });
+  }
 }
 function startRace(){
   if (!S.stats || !S.stats.drivable) return;
@@ -2018,31 +2290,39 @@ function startRace(){
   buildVehicle();
   garageRig.visible = false; buildGroup.visible = false;
   trackGroup.visible = true;
-  chassisGroup.visible = true;
-  wheelMeshes.forEach(m => m.visible = true);
+  showCars(true);
   el('intro').style.display = 'none';
   el('garage').style.display = 'none';
   el('hud').style.display = 'block';
   el('results').style.display = 'none';
   resetProps();                        // a fresh run gets a fresh track
-  spawnAt(0);
+  gridStart();
   S.mode = 'count'; S.countT = 2.99; S.raceT = 0; S.shake = 0; S.lastCd = 9;
   S.lastCpIdx = 0; S.cps = [false,false,false];
   S.prog = 0; S.lastProg = 0; S.sectionIdx = -1;
+  S.lap = 1; S.lapStart = 0; S.lapTimes = []; S.bestLap = null; S.lapFlash = 0; S.place = 1;
   S.driftTotal = 0; S.maxSlip = 0; S.bestChain = 0; S.driftMeter = 0; S.driftT = 0;
   S.mk = { on:false, dir:0, charge:0, tier:0, armed:false, armT:0 };
   S.spacePrev = false; S.boostT = 0; S.boostTier = 0; S.boostsFired = 0; S.bestTier = 0;
 }
 function finish(){
   S.mode = 'done';
+  updateStandings();
   if (S.bestT === null || S.raceT < S.bestT) S.bestT = S.raceT;
+  const ord = ['1st','2nd','3rd','4th','5th'][S.place-1] || (S.place + 'th');
+  const card = el('rcard');
+  card.querySelector('h1').textContent = S.place === 1 ? 'YOU WON' : ord + ' PLACE';
+  card.querySelector('h1').style.color = S.place === 1 ? 'var(--good)' : 'var(--ink)';
+  card.querySelector('.sub').textContent = S.place === 1 ? 'IT HELD TOGETHER' : 'OF ' + (OPPONENTS+1) + ' · IT STILL HELD TOGETHER';
   el('rtime').textContent = S.raceT.toFixed(2);
-  el('rbest').textContent = 'BEST ' + S.bestT.toFixed(2);
+  el('rbest').textContent = 'BEST LAP ' + (S.bestLap === null ? '—' : S.bestLap.toFixed(2)) +
+                           '   ·   ' + S.lapTimes.map(t => t.toFixed(2)).join('  /  ');
   el('rdrift').textContent = S.driftTotal.toFixed(1) + 's';
   el('rangle').textContent = S.boostsFired;
   el('rchain').textContent = ['—','MINI','SUPER','ULTRA'][S.bestTier];
   el('results').style.display = 'flex';
-  Sound.silence(); Sound.chime();
+  Sound.silence();
+  if (S.place === 1) Sound.chime(); else Sound.beep(300, 0.5, 0.14, 'triangle');
 }
 function respawn(){
   spawnAt(S.lastCpIdx);
@@ -2052,6 +2332,26 @@ el('gGo').onclick = startRace;
 el('back').onclick = showGarage;
 el('rGarage').onclick = showGarage;
 el('rAgain').onclick = startRace;
+/* ------------------------------------------------------------ track picker */
+function buildTrackList(){
+  const list = el('trackList');
+  list.innerHTML = '';
+  TRACKS.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'tcard' + (t.ready ? '' : ' locked') + (t === TRACK ? ' on' : '');
+    b.innerHTML = `<div class="tn">${t.name}</div>` +
+                  `<div class="tm">${t.sub} · ${t.len} · ${t.laps} LAPS</div>` +
+                  `<div class="tb">${t.blurb}</div>`;
+    b.disabled = !t.ready;
+    b.onclick = () => {
+      if (!t.ready) return;
+      TRACK = t; buildTrackList();
+      Sound.beep(440, 0.07, 0.12, 'triangle');
+    };
+    list.appendChild(b);
+  });
+}
+
 el('btnDrive').onclick = () => { Sound.init(); Sound.beep(320, 0.1, 0.18); showGarage(); };
 el('btnSettings').onclick = openSettings;
 el('setClose').onclick = closeSettings;
@@ -2243,8 +2543,11 @@ function step(dt){
     }
   }
 
+  if (S.mode === 'race') for (const c of opps) driveAI(c, dt);
+
   world.step(T.fixed, dt, 3);
   driftSteerVelocity(dt);
+  if (S.mode === 'race') updateStandings();
 
   if (S.mode === 'race' && !S.dead) {
     S.raceT += dt;
@@ -2279,7 +2582,17 @@ function step(dt){
       const f = 0.25*(i+1);
       if (!S.cps[i] && Math.abs(S.prog - f) < 0.04) S.cps[i] = true;
     }
-    if (S.lastProg > 0.85 && S.prog < 0.12 && S.cps.every(Boolean)) finish();
+    // Crossing the line: bank the lap, reset the checkpoints, or finish.
+    if (S.lastProg > 0.85 && S.prog < 0.12 && S.cps.every(Boolean)) {
+      const lapT = S.raceT - S.lapStart;
+      S.lapTimes.push(lapT);
+      if (S.bestLap === null || lapT < S.bestLap) S.bestLap = lapT;
+      S.lap++;
+      S.lapStart = S.raceT;
+      S.cps = [false, false, false];
+      if (S.lap > LAPS) finish();
+      else { Sound.beep(880, 0.18, 0.16, 'triangle'); S.lapFlash = 1.6; }
+    }
 
     S.sectionIdx = SECTIONS.findIndex(s => S.prog >= s.a && S.prog < s.b);
 
@@ -2301,6 +2614,30 @@ const camPos = new THREE.Vector3(), camAim = new THREE.Vector3(), tmpV = new THR
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _cv = new CANNON.Vec3();
 const _mid = new THREE.Vector3(), _dir = new THREE.Vector3(), _UP = new THREE.Vector3(0,1,0);
 let camInit = false;
+
+// Pose one car's meshes from its physics: hull, wheels, and the linkage that
+// ties them together. Runs for the player and every opponent alike.
+function syncCar(car){
+  if (!car) return;
+  car.group.position.copy(car.body.position);
+  car.group.quaternion.copy(car.body.quaternion);
+  for (let i = 0; i < car.vehicle.wheelInfos.length; i++) {
+    car.vehicle.updateWheelTransform(i);
+    const t = car.vehicle.wheelInfos[i].worldTransform;
+    car.wheels[i].position.copy(t.position);
+    car.wheels[i].quaternion.copy(t.quaternion);
+
+    // Span the shock from its chassis mount to the hub, and the arm from
+    // inboard to the hub. Both stretch as the suspension travels.
+    const L = car.links[i];
+    car.body.pointToWorldFrame(new CANNON.Vec3(L.mount.x, L.mount.y, L.mount.z), _cv);
+    _a.set(_cv.x, _cv.y, _cv.z);
+    car.body.pointToWorldFrame(new CANNON.Vec3(L.root.x, L.root.y, L.root.z), _cv);
+    _b.set(_cv.x, _cv.y, _cv.z);
+    spanTo(L.shock, _a, t.position);
+    spanTo(L.arm, _b, t.position);
+  }
+}
 
 // Stretch a unit-height, centre-origin mesh so it spans A to B.
 function spanTo(mesh, A, B){
@@ -2351,24 +2688,8 @@ function present(dt){
   }
   if (!vehicle) { atmos(dt); return; }
 
-  chassisGroup.position.copy(chassisBody.position);
-  chassisGroup.quaternion.copy(chassisBody.quaternion);
-  for (let i = 0; i < vehicle.wheelInfos.length; i++) {
-    vehicle.updateWheelTransform(i);
-    const t = vehicle.wheelInfos[i].worldTransform;
-    wheelMeshes[i].position.copy(t.position);
-    wheelMeshes[i].quaternion.copy(t.quaternion);
-
-    // Span the shock from its chassis mount to the hub, and the arm from
-    // inboard to the hub. Both stretch as the suspension travels.
-    const L = linkages[i];
-    chassisBody.pointToWorldFrame(new CANNON.Vec3(L.mount.x, L.mount.y, L.mount.z), _cv);
-    _a.set(_cv.x, _cv.y, _cv.z);
-    chassisBody.pointToWorldFrame(new CANNON.Vec3(L.root.x, L.root.y, L.root.z), _cv);
-    _b.set(_cv.x, _cv.y, _cv.z);
-    spanTo(L.shock, _a, t.position);
-    spanTo(L.arm, _b, t.position);
-  }
+  syncCar(player);
+  for (const c of opps) syncCar(c);
   for (const d of dynProps) if (!d.body.sleepState) syncProp(d);   // 0 = AWAKE
 
   // Chase cam follows travel direction when moving, nose direction when not.
@@ -2411,7 +2732,15 @@ function present(dt){
 
   el('spd').textContent = Math.round(S.speed*3.6);
   el('clock').textContent = S.raceT.toFixed(2);
-  el('best').textContent = S.bestT === null ? 'BEST —' : 'BEST ' + S.bestT.toFixed(2);
+  el('best').textContent = S.bestLap === null ? 'BEST LAP —' : 'BEST LAP ' + S.bestLap.toFixed(2);
+  el('lapNum').textContent = 'LAP ' + Math.min(S.lap, LAPS) + '/' + LAPS;
+  el('place').textContent = 'P' + S.place + '/' + (OPPONENTS + 1);
+  if (S.lapFlash > 0) {
+    S.lapFlash -= dt;
+    const lf = el('lapFlash');
+    lf.textContent = S.lap > LAPS ? 'FINAL LAP' : 'LAP ' + S.lap;
+    lf.style.opacity = Math.min(1, S.lapFlash);
+  } else el('lapFlash').style.opacity = 0;
   const sec = SECTIONS[S.sectionIdx];
   el('sectName').textContent = sec ? sec.name : '—';
   el('sectTest').textContent = sec ? sec.test : '';
@@ -2488,6 +2817,7 @@ setInterval(() => {
 window.__dbg = {
   S, T, PARTS, PRESETS, CANNON, world, THREE, camera, scene, dynProps,
   veh: () => vehicle, chassis: () => chassisBody, hf: () => hfBody, links: () => linkages,
+  cars: () => ({ player, opps }),
   // Free camera for inspection: skips present() so the chase cam can't stomp it.
   look(from, at){
     camera.position.set(from[0], from[1], from[2]);
@@ -2583,11 +2913,11 @@ S.cells = PRESETS['THE BRICK']();
 setTool('frame');
 refresh();
 buildSettings();
+buildTrackList();
+renderGarage();
 applyFx(SETTINGS.fx);
 Sound.setVol('master', SETTINGS.master);
 Sound.setVol('sfx', SETTINGS.sfx);
-el('introTrack').textContent = TRACK_NAME;
-el('introSub').textContent = TRACK_SUB;
 el('sectTest').textContent = '';
 showIntro();
 fitCanvas();

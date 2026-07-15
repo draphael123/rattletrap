@@ -40,9 +40,17 @@ Give it a 1-metre wheelbase and enough engine and it will backflip off the start
 - **Off-road costs you ~33%.** Dirt is modelled per-wheel: whichever tyres are off the road get rolling resistance and reduced grip, so putting two wheels in the sand drags *and* pulls you sideways. Cutting a corner is a real decision.
 - **Roll it and it recovers.** On your roof and stopped for two seconds and it puts you back on the last checkpoint.
 
+## The race
+
+**Three laps, four machines.** The opposition is built out of the same parts you are and driven by the same physics — no grip bonus, no rubber-banding, no cheating. They just follow their own line and brake for corners. They're quick: a typical finish is decided by a few car lengths.
+
+## The garage
+
+Build it, name it, keep it. Saved machines live in your browser and load back with a click. Same name overwrites rather than duplicating.
+
 ## THE OLD 47
 
-One lap, 850 m, six stretches — each interrogating one decision:
+850 m, six stretches — each interrogating one decision:
 
 - **THE STRAIGHT** — power against weight
 - **THE CHICANE** — grip and wheelbase
