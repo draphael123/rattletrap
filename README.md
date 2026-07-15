@@ -27,12 +27,18 @@ Four preset machines, one autopilot, one lap each:
 
 | Build | Lap | |
 |---|---|---|
-| **THE BRICK** | 32.43s | Balanced. Boring. Quickest. |
-| **THE RAIL** | 34.00s | Long and low. Pitches over the crest — 100 → 49 km/h on the jump. |
-| **THE ANVIL** | 34.93s | 636 kg with ballast in the nose. Corners at 51 km/h, 10° of slip. |
-| **THE TOWER** | **DNF** | Flipped onto its roof on the washboard at 39%. |
+| **THE RAIL** | 34.2s | Long, low, wide. Never puts a wheel wrong. |
+| **THE TOWER** | 35.2s | Tall and narrow. Survives only because the bot drives it carefully. |
+| **THE BRICK** | 37.9s | Balanced, but ran wide — 98 frames in the dirt. |
+| **THE ANVIL** | 41.2s | 636 kg with ballast in the nose. Understeers into everything. |
 
 Give it a 1-metre wheelbase and enough engine and it will backflip off the start line, because the rearward load transfer exceeds the static front load. That's not a special case anyone wrote. It's just true.
+
+## The wasteland has opinions
+
+- **Everything is solid.** Edge stakes are light dynamic bodies — clip one and it cartwheels away and costs you speed, rather than acting as a wall that deletes your run. Burnt-out husks, dead trees and shacks do not move. Neither do the overpass pillars.
+- **Off-road costs you ~33%.** Dirt is modelled per-wheel: whichever tyres are off the road get rolling resistance and reduced grip, so putting two wheels in the sand drags *and* pulls you sideways. Cutting a corner is a real decision.
+- **Roll it and it recovers.** On your roof and stopped for two seconds and it puts you back on the last checkpoint.
 
 ## The track
 
@@ -72,7 +78,8 @@ __dbg.go()                  // start a run
 __dbg.stats()               // mass, CoM, inertia, balance, frontal area
 __dbg.auto(600)             // headless track-follower; drives real laps
 __dbg.sim(120, ['w','a'])   // step physics with keys held (immune to rAF throttling)
-__dbg.state()               // speed, progress, slip, wheels in contact
+__dbg.state()               // speed, progress, slip, off-road, wheels in contact
+__dbg.look([x,y,z],[x,y,z]) // free camera; returns a JPEG data URL
 ```
 
 `__dbg.auto()` is how those lap times were measured, and it's the seed for AI opponents.

@@ -202,6 +202,11 @@ const T = {
   enginePerBlock: 3200,                // N of drive force per engine block
   dragK: 0.9,                          // RaycastVehicle has no aero drag of its own
   brakeForce: 45,
+  // Rolling resistance of dirt, per off-road wheel. NOTE these are cannon
+  // IMPULSE units, summed directly against engineForce*timeStep — which is only
+  // ~13 per wheel here. Anything near that number is a parking brake, not mud.
+  offRoadBrake: 5.5,                   // measured: ~33% slower in the dirt than on the road
+  offRoadGrip: 0.55,                   // and it's loose, so it lets go sooner
   maxSteer: 0.52, steerFalloff: 0.05, steerRate: 3.4,
   fixed: 1 / 60,
 };
@@ -219,7 +224,7 @@ const S = {
   cells:new Map(),
   raceT:0, bestT:null, countT:0,
   prog:0, lastProg:0, cps:[false,false,false], lastCpIdx:0,
-  speed:0, dead:false, deadT:0, sectionIdx:-1,
+  speed:0, dead:false, deadT:0, stuckT:0, sectionIdx:-1, offRoad:0, shake:0,
   stats:null, steer:0, throttle:0, brake:0,
   auto:null,                            // set by __dbg.auto() to drive the car headlessly
 };
@@ -407,6 +412,61 @@ motes.frustumCulled = false;
 const moteRig = new THREE.Group();
 moteRig.add(motes);
 scene.add(moteRig);
+// Sparks — same ring-buffer idea, but additive, gravity-bound and short-lived.
+const SPK_N = 180;
+const sPos = new Float32Array(SPK_N*3), sVel = new Float32Array(SPK_N*3);
+const sLife = new Float32Array(SPK_N), sSize = new Float32Array(SPK_N);
+let sHead = 0;
+const spkGeo = new THREE.BufferGeometry();
+spkGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
+spkGeo.setAttribute('aLife', new THREE.BufferAttribute(sLife, 1));
+spkGeo.setAttribute('aSize', new THREE.BufferAttribute(sSize, 1));
+const spkMat = new THREE.ShaderMaterial({
+  transparent:true, depthWrite:false, fog:false, blending:THREE.AdditiveBlending,
+  uniforms: { uMap:{value:DOT}, uCol:{value:new THREE.Color(0xffb45a)}, uScale:{value:500} },
+  vertexShader: `
+    attribute float aLife; attribute float aSize; varying float vL;
+    uniform float uScale;
+    void main(){
+      vL = aLife;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = aSize * (uScale / max(-mv.z, 1.0));
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    uniform sampler2D uMap; uniform vec3 uCol; varying float vL;
+    void main(){
+      if (vL <= 0.0) discard;
+      gl_FragColor = vec4(uCol * (0.6 + vL), texture2D(uMap, gl_PointCoord).a * vL);
+    }`,
+});
+const spks = new THREE.Points(spkGeo, spkMat);
+spks.frustumCulled = false;
+scene.add(spks);
+function spawnSparks(x, y, z, n, power){
+  for (let i = 0; i < n; i++) {
+    const j = sHead = (sHead + 1) % SPK_N;
+    sPos[j*3] = x; sPos[j*3+1] = y; sPos[j*3+2] = z;
+    const sp = 2 + Math.random()*7*power;
+    const th = Math.random()*6.283, ph = Math.random()*1.2;
+    sVel[j*3] = Math.cos(th)*Math.cos(ph)*sp;
+    sVel[j*3+1] = Math.sin(ph)*sp + 1.5;
+    sVel[j*3+2] = Math.sin(th)*Math.cos(ph)*sp;
+    sLife[j] = 1; sSize[j] = 0.04 + Math.random()*0.07;
+  }
+}
+function updateSparks(dt){
+  for (let j = 0; j < SPK_N; j++) {
+    if (sLife[j] <= 0) continue;
+    sLife[j] -= dt*1.9;
+    sVel[j*3+1] -= 26*dt;
+    sPos[j*3] += sVel[j*3]*dt; sPos[j*3+1] += sVel[j*3+1]*dt; sPos[j*3+2] += sVel[j*3+2]*dt;
+  }
+  spkGeo.attributes.position.needsUpdate = true;
+  spkGeo.attributes.aLife.needsUpdate = true;
+  spkGeo.attributes.aSize.needsUpdate = true;
+}
+
 function updateMotes(dt){
   moteRig.position.set(camera.position.x, 0, camera.position.z);
   for (let i = 0; i < MOTE_N; i++) {
@@ -437,6 +497,8 @@ addEventListener('resize', fitCanvas);
 const world = new CANNON.World({ gravity:new CANNON.Vec3(0,-19.6,0) });
 world.broadphase = new CANNON.SAPBroadphase(world);
 world.defaultContactMaterial.friction = 0.35;
+// Hundreds of prop bodies exist but almost all are asleep at any moment.
+world.allowSleep = true;
 
 /* =================================================================== TRACK */
 const CP = [
@@ -561,6 +623,55 @@ world.addBody(hfBody);
 const trackGroup = new THREE.Group();
 scene.add(trackGroup);
 
+/* ------------------------------------------------------------ prop bodies */
+// Anything you can hit. Dynamic props are individual meshes so their transform
+// can follow the body; static ones stay instanced (a static body never moves,
+// so its instance matrix never needs rewriting).
+const dynProps = [];                    // {mesh, body, home:{p,q}}
+const DYN_RANGE = 32;                   // dynamic only near the road; you'll never reach the rest
+const STATIC_RANGE = 70;
+
+function addStaticBox(half, pos, quat){
+  const b = new CANNON.Body({ mass:0, shape:new CANNON.Box(new CANNON.Vec3(half.x, half.y, half.z)) });
+  b.position.set(pos.x, pos.y, pos.z);
+  if (quat) b.quaternion.set(quat.x, quat.y, quat.z, quat.w);
+  world.addBody(b);
+  return b;
+}
+// meshOff = body-local vector from the physics box centre to the mesh origin
+// (the art has its origin at the base, the box is centred).
+function addDynProp(mesh, half, mass, pos, quat, meshOff){
+  const b = new CANNON.Body({ mass, shape:new CANNON.Box(new CANNON.Vec3(half.x, half.y, half.z)) });
+  b.position.set(pos.x, pos.y, pos.z);
+  if (quat) b.quaternion.set(quat.x, quat.y, quat.z, quat.w);
+  b.allowSleep = true; b.sleepSpeedLimit = 0.35; b.sleepTimeLimit = 0.5;
+  b.linearDamping = 0.06; b.angularDamping = 0.12;
+  b.sleep();
+  world.addBody(b);
+  trackGroup.add(mesh);
+  const rec = { mesh, body:b, off:(meshOff || new THREE.Vector3()).clone(),
+                home:{ p:b.position.clone(), q:b.quaternion.clone() } };
+  dynProps.push(rec);
+  syncProp(rec);
+  return rec;
+}
+const _po = new THREE.Vector3();
+function syncProp(d){
+  _po.copy(d.off).applyQuaternion(d.body.quaternion);
+  d.mesh.position.set(d.body.position.x + _po.x, d.body.position.y + _po.y, d.body.position.z + _po.z);
+  d.mesh.quaternion.copy(d.body.quaternion);
+}
+// A fresh run gets a fresh track — otherwise lap 2 is run through your own debris.
+function resetProps(){
+  for (const d of dynProps) {
+    d.body.position.copy(d.home.p);
+    d.body.quaternion.copy(d.home.q);
+    d.body.velocity.setZero(); d.body.angularVelocity.setZero();
+    d.body.sleep();
+    syncProp(d);
+  }
+}
+
 { // matching visual mesh
   const g = new THREE.BufferGeometry(), pos = [], col = [], idx = [];
   // These must be far apart in VALUE or the road vanishes — three shades of the
@@ -591,6 +702,73 @@ scene.add(trackGroup);
   trackGroup.add(mesh);
 }
 
+/* ------------------------------------------------------------ the road */
+// The terrain heightfield is 3m per cell — far too coarse to show a wheel rut.
+// So the road gets its own ribbon along the spline at ~1.8m x 0.5m resolution,
+// laid 4cm proud of the terrain and faded out at the edges with per-vertex
+// alpha (a 4-component colour attribute) so there is no seam to hide.
+{
+  const LAT = 26, HW = HALFW + 2.4;
+  const pos = [], col = [], idx = [];
+  const cBase = new THREE.Color(0x6d5c46);   // packed dirt
+  const cRut  = new THREE.Color(0x483c2d);   // where every wheel has already been
+  const cAsph = new THREE.Color(0x3c3a37);   // what's left of the old highway
+  const cLine = new THREE.Color(0xa8912f);   // faded centre line
+  const cGrav = new THREE.Color(0xa8916b);   // gravel breaking up at the shoulder
+  const c = new THREE.Color();
+  for (let i = 0; i <= NSAMP; i++) {
+    const ii = i % NSAMP;
+    const p = TR.pts[ii], nrm = TR.nrms[ii], frac = ii/NSAMP, arc = TR.cum[ii];
+    for (let j = 0; j <= LAT; j++) {
+      const lat = -HW + (2*HW)*(j/LAT);
+      const wx = p.x + nrm.x*lat, wz = p.z + nrm.z*lat;
+      pos.push(wx, roadElev(frac, arc) + roadCamber(frac)*lat + 0.04, wz);
+
+      const al = Math.abs(lat);
+      c.copy(cBase);
+      c.lerp(cGrav, vnoise(wx*0.5, wz*0.5)*0.22);                       // mottle
+
+      // Slabs of surviving tarmac, only within the lane.
+      const patch = smoothstep(0.50, 0.63, vnoise(arc*0.021, 11.3));
+      const asph = patch * (1 - smoothstep(HALFW-1.9, HALFW-0.7, al));
+      c.lerp(cAsph, asph*0.88);
+
+      // Dashed centre line, but only where there is tarmac left to paint on.
+      const dash = (Math.floor(arc/3.4) % 2) === 0 ? 1 : 0;
+      c.lerp(cLine, (1 - smoothstep(0.10, 0.24, al)) * dash * asph * 0.75);
+
+      // Twin ruts worn by everyone who came before.
+      const rut = 1 - smoothstep(0.30, 0.80, Math.abs(al - 2.3));
+      c.lerp(cRut, rut*0.5*(1 - asph*0.6));
+
+      // Gravel breaking up toward the shoulder.
+      c.lerp(cGrav, smoothstep(HALFW-1.3, HALFW+0.4, al)*0.75);
+
+      c.multiplyScalar(0.9 + vnoise(wx*1.1, wz*1.1)*0.2);
+      col.push(c.r, c.g, c.b, 1 - smoothstep(HALFW+0.3, HW, al));
+    }
+  }
+  // nrm is the RIGHT-hand normal, so cross(tan, nrm) points DOWN — the winding
+  // has to be (a,d,b) / (b,d,e) or the whole road renders unlit, exactly like
+  // the terrain did.
+  const W = LAT + 1;
+  for (let i = 0; i < NSAMP; i++) for (let j = 0; j < LAT; j++) {
+    const a = i*W+j, b = (i+1)*W+j, d = i*W+j+1, e = (i+1)*W+j+1;
+    idx.push(a, d, b, b, d, e);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));   // itemSize 4 = per-vertex alpha
+  g.setIndex(idx); g.computeVertexNormals();
+  const road = new THREE.Mesh(g, new THREE.MeshStandardMaterial({
+    vertexColors:true, transparent:true, depthWrite:false,
+    roughness:0.93, metalness:0.03,
+  }));
+  road.receiveShadow = true;
+  road.renderOrder = 1;
+  trackGroup.add(road);
+}
+
 /* ------------------------------------------------- wreckage of the old world */
 // Generic boxes read as "prototype". These are the same instanced cost but say
 // something: a road that people used to drive, and then stopped.
@@ -608,10 +786,12 @@ const WRECKS = {
       gBox(0.5, 0.5, 0.5, 0.85, 0.28, 1.85),
     ]),
     n: 90, scale: [0.8, 1.35], col: [0x6b3a22, 0x7d5a3c, 0x4a4a44],
+    half: { x:1.05, y:0.72, z:2.3 }, cy: 0.72, mass: 0,     // a dead car does not move
   },
   drum: {   // oil drums, mostly on their side
     geo: () => { const g = new THREE.CylinderGeometry(0.42, 0.42, 1.1, 10); g.rotateZ(Math.PI/2); g.translate(0, 0.42, 0); return g; },
     n: 120, scale: [0.75, 1.3], col: [0x8a4a24, 0x4a5a3a, 0x93762f],
+    half: { x:0.56, y:0.42, z:0.42 }, cy: 0.42, mass: 15,   // these fly
   },
   tyres: {  // stacked tyres
     geo: () => mergeGeometries([
@@ -620,6 +800,7 @@ const WRECKS = {
       new THREE.CylinderGeometry(0.62, 0.62, 0.34, 12).translate(-0.04, 0.85, 0.08),
     ]),
     n: 70, scale: [0.85, 1.25], col: [0x1e1a18, 0x2a2422],
+    half: { x:0.62, y:0.58, z:0.62 }, cy: 0.58, mass: 24,
   },
   tree: {   // dead scrub, no leaves left
     geo: () => mergeGeometries([
@@ -628,6 +809,7 @@ const WRECKS = {
       gBox(0.18, 1.4, 0.18, -0.42, 2.95, 0.2, 0.3, 0, 0.7),
     ]),
     n: 110, scale: [0.7, 1.5], col: [0x4a3a2a, 0x5c4a34],
+    half: { x:0.22, y:1.7, z:0.22 }, cy: 1.7, mass: 0,
   },
   shack: {  // corrugated lean-to, collapsed
     geo: () => mergeGeometries([
@@ -635,28 +817,46 @@ const WRECKS = {
       gBox(3.9, 0.18, 3.6, 0, 2.3, 0, 0.13, 0, 0),
     ]),
     n: 34, scale: [0.9, 1.6], col: [0x6b5a44, 0x7a5230, 0x55584a],
+    half: { x:1.75, y:1.15, z:1.5 }, cy: 1.15, mass: 0,
   },
 };
 for (const key in WRECKS) {
   const W = WRECKS[key];
   W.g = W.geo();                       // cached — the garage re-uses these
+  W.mats = W.col.map(c => new THREE.MeshStandardMaterial({ color:c, roughness:0.94, metalness:0.15, flatShading:true }));
   const inst = new THREE.InstancedMesh(W.g,
     new THREE.MeshStandardMaterial({ roughness:0.94, metalness:0.15, flatShading:true }), W.n);
   inst.castShadow = true; inst.receiveShadow = true;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
   const p = new THREE.Vector3(), sc = new THREE.Vector3(), cc = new THREE.Color();
+  const cen = new THREE.Vector3(), off = new THREE.Vector3();
   let n = 0, guard = 0;
   while (n < W.n && guard++ < W.n*40) {
     const x = X0 + Math.random()*(X1-X0), z = Z0 + Math.random()*(Z1-Z0);
-    if (nearestOnTrack(x,z).d < HALFW + SHOULDER + 2.5) continue;
+    const dist = nearestOnTrack(x, z).d;
+    if (dist < HALFW + SHOULDER + 2.5) continue;
     const s = W.scale[0] + Math.random()*(W.scale[1]-W.scale[0]);
     // Half-buried, half-toppled. Nothing out here is upright any more.
     e.set((Math.random()-.5)*0.55, Math.random()*6.28, (Math.random()-.5)*0.55);
     q.setFromEuler(e);
     p.set(x, terrainBase(x,z) - 0.18*s, z); sc.set(s, s, s);
+    const half = { x:W.half.x*s, y:W.half.y*s, z:W.half.z*s };
+    // Geometry origin sits at the base; the physics box is centred, so the two
+    // are offset by cy*s along the body's own up axis.
+    cen.set(0, W.cy*s, 0).applyQuaternion(q);
+    const bodyPos = p.clone().add(cen);
+
+    if (W.mass > 0 && dist < DYN_RANGE) {
+      const m = new THREE.Mesh(W.g, W.mats[(Math.random()*W.mats.length)|0]);
+      m.scale.copy(sc); m.castShadow = true; m.receiveShadow = true;
+      off.set(0, -W.cy*s, 0);
+      addDynProp(m, half, W.mass*s*s*s, bodyPos, q, off);
+      continue;                        // dynamic props are not instanced
+    }
     m4.compose(p, q, sc); inst.setMatrixAt(n, m4);
     cc.set(W.col[(Math.random()*W.col.length)|0]).offsetHSL(0, (Math.random()-.5)*0.05, (Math.random()-.5)*0.11);
     inst.setColorAt(n, cc);
+    if (dist < STATIC_RANGE) addStaticBox(half, bodyPos, q);
     n++;
   }
   inst.count = n;
@@ -676,10 +876,14 @@ const rustMat = (c, r = 0.92) => new THREE.MeshStandardMaterial({ color:c, rough
   g.position.set(p.x, y0, p.z);
   g.rotation.y = yaw;
   const conc = rustMat(0x8f8778, 0.97), rebar = rustMat(0x6b3a1e, 0.85);
+  const wp = new THREE.Vector3(), wq = new THREE.Quaternion();
   for (const side of [-1, 1]) {
     const pil = new THREE.Mesh(new THREE.BoxGeometry(2.6, 13, 2.6), conc);
     pil.position.set(side*(HALFW+4.2), 6.5, 0);
     pil.castShadow = true; g.add(pil);
+    g.updateWorldMatrix(true, false);
+    pil.getWorldPosition(wp); pil.getWorldQuaternion(wq);
+    addStaticBox({ x:1.3, y:6.5, z:1.3 }, wp, wq);   // solid. hit this and you are done.
   }
   // Deck in two pieces with the middle blown out, and one slab left dangling.
   for (const side of [-1, 1]) {
@@ -720,6 +924,7 @@ const rustMat = (c, r = 0.92) => new THREE.MeshStandardMaterial({ color:c, rough
     m.rotation.z = (k % 3 === 1) ? 0.09 : 0;      // one of them is leaning
     m.castShadow = true;
     trackGroup.add(m);
+    if (near.d < STATIC_RANGE) addStaticBox({ x:1.35, y:7.5, z:1.35 }, { x, y:y+7.2, z }, null);
     tops.push(new THREE.Vector3(x, y + 12.4, z));
   }
   const cableMat = new THREE.LineBasicMaterial({ color:0x2c241c, transparent:true, opacity:0.75 });
@@ -754,28 +959,26 @@ const rustMat = (c, r = 0.92) => new THREE.MeshStandardMaterial({ color:c, rough
   }
 }
 
-{ // edge stakes down both sides — without these there is no visible racing line
+{ // Edge stakes. Dynamic and light on purpose: a static post at 90km/h is a
+  // wall and just deletes your run. These cartwheel away and cost you a little
+  // speed, which is the right punishment for clipping one.
   const g = new THREE.BoxGeometry(0.34, 1.5, 0.34);
-  const every = 7, n = Math.floor(NSAMP/every)*2;
-  const inst = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ roughness:0.8, flatShading:true }), n);
-  inst.castShadow = true;
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), one = new THREE.Vector3(1,1,1);
-  const p3 = new THREE.Vector3(), cA = new THREE.Color(0xd8552a), cB = new THREE.Color(0xdedad0);
-  let k = 0;
+  const matA = new THREE.MeshStandardMaterial({ color:0xc94f28, roughness:0.82, flatShading:true });
+  const matB = new THREE.MeshStandardMaterial({ color:0xcfc9bd, roughness:0.82, flatShading:true });
+  const every = 7;
+  const half = { x:0.17, y:0.75, z:0.17 };
+  const p3 = new THREE.Vector3();
   for (let i = 0; i < NSAMP; i += every) {
     const p = TR.pts[i], nrm = TR.nrms[i], frac = i/NSAMP;
     for (const side of [-1, 1]) {
       const off = HALFW + 0.5;
       const y = roadElev(frac, TR.cum[i]) + roadCamber(frac)*off*side;
       p3.set(p.x + nrm.x*side*off, y + 0.75, p.z + nrm.z*side*off);
-      m4.compose(p3, q, one);
-      inst.setMatrixAt(k, m4);
-      inst.setColorAt(k, (i/every) % 2 === 0 ? cA : cB);
-      k++;
+      const m = new THREE.Mesh(g, (i/every) % 2 === 0 ? matA : matB);
+      m.castShadow = true;
+      addDynProp(m, half, 7, p3, null, null);
     }
   }
-  inst.count = k;
-  trackGroup.add(inst);
 }
 
 { // start gate + section markers, so the track reads as a track
@@ -800,8 +1003,33 @@ const buildGroup = new THREE.Group();
 scene.add(buildGroup);
 
 const partGeo = new THREE.BoxGeometry(T.cell*0.96, T.cell*0.96, T.cell*0.96);
-const wheelGeo = new THREE.CylinderGeometry(T.wheelR, T.wheelR, T.wheelW, 18);
-wheelGeo.rotateZ(Math.PI/2);                                   // axis along X
+
+// Tyre + tread blocks. The treads matter: a smooth cylinder gives you no way
+// to see the wheel spinning, which is half of why it read as detached.
+const tyreGeo = (() => {
+  const parts = [new THREE.CylinderGeometry(T.wheelR, T.wheelR, T.wheelW, 18).rotateZ(Math.PI/2)];
+  for (let k = 0; k < 11; k++) {
+    const a = k/11 * Math.PI*2;
+    const b = new THREE.BoxGeometry(T.wheelW*1.08, 0.085, 0.19);
+    b.translate(0, T.wheelR, 0);       // out to the tread face
+    b.rotateX(a);                      // then round the axle (which is X)
+    parts.push(b);
+  }
+  return mergeGeometries(parts);
+})();
+const rimGeo = mergeGeometries([
+  new THREE.CylinderGeometry(T.wheelR*0.54, T.wheelR*0.54, T.wheelW*1.16, 10).rotateZ(Math.PI/2),
+  new THREE.CylinderGeometry(T.wheelR*0.17, T.wheelR*0.17, T.wheelW*1.7, 8).rotateZ(Math.PI/2),
+]);
+const rimMat = new THREE.MeshStandardMaterial({ color:0x8a6f4e, roughness:0.62, metalness:0.6, flatShading:true });
+const linkMat = new THREE.MeshStandardMaterial({ color:0x5c5148, roughness:0.6, metalness:0.65, flatShading:true });
+// Machined steel, not rust — it needs to read as hardware against the matte
+// scavenged panels, without glowing like a traffic cone.
+const shockMat = new THREE.MeshStandardMaterial({ color:0x584c42, roughness:0.34, metalness:0.85, flatShading:true });
+// Unit-height boxes with the origin at the centre: scale.y spans A to B.
+const linkGeo = new THREE.BoxGeometry(0.11, 1, 0.11);
+const shockGeo = new THREE.CylinderGeometry(0.075, 0.075, 1, 8);
+const wheelGeo = tyreGeo;                                      // garage preview uses the tyre alone
 // Four rusted variants per part, chosen per-cell, so a hull reads as panels
 // scavenged off four different dead cars rather than one moulded object.
 const VARIANTS = 4;
@@ -938,6 +1166,11 @@ function computeStats(){
   }
   height = Math.max(...blocks.map(b => b.p.y + h));
 
+  // Chassis extents (wheels excluded) — the suspension art hangs off these.
+  const solid = blocks.filter(b => b.type !== 'wheel');
+  const bodyTop = solid.length ? Math.max(...solid.map(b => b.p.y + h)) - com.y : 0;
+  const bodyHalfW = solid.length ? Math.max(...solid.map(b => Math.abs(b.p.x - com.x))) + h : 0.3;
+
   // Frontal silhouette, wheels included — feeds the drag we add by hand.
   const xs = blocks.map(b => b.p.x);
   const frontArea = ((Math.max(...xs) - Math.min(...xs)) + T.cell) * height;
@@ -951,7 +1184,7 @@ function computeStats(){
 
   return {
     empty:false, mass, com, I, blocks, wheels, engines, steerKeys, frontArea,
-    width, height, wheelbase, balance, warnings,
+    width, height, wheelbase, balance, warnings, bodyTop, bodyHalfW,
     power: engines * T.enginePerBlock,
     ratio: (engines * T.enginePerBlock) / mass,
     drivable: engines > 0 && wheels.length >= 2,
@@ -987,13 +1220,14 @@ function renderStats(){
 function refresh(){ S.stats = computeStats(); rebuildMeshes(); renderStats(); }
 
 /* ------------------------------------------------------------- the vehicle */
-let vehicle = null, chassisBody = null, chassisGroup = null, wheelMeshes = [];
+let vehicle = null, chassisBody = null, chassisGroup = null, wheelMeshes = [], linkages = [];
 
 function buildVehicle(){
   if (vehicle) { vehicle.removeFromWorld(world); vehicle = null; }
   if (chassisGroup) { scene.remove(chassisGroup); chassisGroup = null; }
   wheelMeshes.forEach(m => scene.remove(m));
-  wheelMeshes = [];
+  linkages.forEach(l => { scene.remove(l.shock); scene.remove(l.arm); });
+  wheelMeshes = []; linkages = [];
 
   const st = S.stats;
   chassisBody = new CANNON.Body({ mass:st.mass });
@@ -1039,6 +1273,20 @@ function buildVehicle(){
   vehicle.addToWorld(world);
   chassisBody.userData = { minWheelY };
 
+  // Impact feedback. getImpactVelocityAlongNormal is signed, and the contact's
+  // ri/rj are relative to bi/bj, so which one is the chassis decides the maths.
+  chassisBody.addEventListener('collide', e => {
+    const imp = Math.abs(e.contact.getImpactVelocityAlongNormal());
+    if (imp < 2.2) return;
+    const chassisIsA = e.contact.bi === chassisBody;
+    const b = chassisIsA ? e.contact.bi : e.contact.bj;
+    const r = chassisIsA ? e.contact.ri : e.contact.rj;
+    const px = b.position.x + r.x, py = b.position.y + r.y, pz = b.position.z + r.z;
+    const power = Math.min(1, imp/16);
+    spawnSparks(px, py, pz, 3 + ((power*13)|0), power);
+    S.shake = Math.max(S.shake, power);
+  });
+
   chassisGroup = new THREE.Group();
   for (const b of st.blocks) {
     if (b.type === 'wheel') continue;
@@ -1049,9 +1297,31 @@ function buildVehicle(){
   }
   scene.add(chassisGroup);
   for (const w of st.wheels) {
-    const m = new THREE.Mesh(wheelGeo, matFor('wheel', w.k));
-    m.castShadow = true;
-    scene.add(m); wheelMeshes.push(m);
+    // Wheel = tyre + rim as a group, so the rim can be metal.
+    const g = new THREE.Group();
+    const tyre = new THREE.Mesh(tyreGeo, matFor('wheel', w.k));
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    tyre.castShadow = true; rim.castShadow = true;
+    g.add(tyre, rim);
+    scene.add(g); wheelMeshes.push(g);
+
+    // The linkage is the whole point: a shock down from the mount and an arm
+    // inboard to the hub. Without these the wheels just hover beside the hull.
+    const shock = new THREE.Mesh(shockGeo, shockMat);
+    const arm = new THREE.Mesh(linkGeo, linkMat);
+    shock.castShadow = true; arm.castShadow = true;
+    scene.add(shock); scene.add(arm);
+    const off = w.p.clone().sub(st.com);
+    const sx = Math.sign(off.x) || 1;
+    // The true suspension mount is directly above the hub at the wheel's own x,
+    // which means a strut drawn there is entirely inside the tyre. Route the
+    // shock diagonally from the chassis TOP edge instead: it crosses the gap
+    // between hull and wheel and rises clear of the tread, where you can see it.
+    linkages.push({
+      shock, arm,
+      mount: new THREE.Vector3(sx * Math.min(Math.abs(off.x), st.bodyHalfW*0.8), st.bodyTop - 0.1, off.z),
+      root:  new THREE.Vector3(sx * st.bodyHalfW * 0.3, off.y, off.z),
+    });
   }
 }
 
@@ -1070,7 +1340,14 @@ function spawnAt(sampleIdx){
     vehicle.applyEngineForce(0, i2);
     vehicle.wheelInfos[i2].suspensionLength = T.suspRest;
   }
-  S.dead = false; S.deadT = 0;
+  S.dead = false; S.deadT = 0; S.stuckT = 0;
+}
+
+const _uq = new THREE.Quaternion(), _uv = new THREE.Vector3();
+function chassisUpY(){
+  if (!chassisBody) return 1;
+  _uv.set(0, 1, 0).applyQuaternion(_uq.copy(chassisBody.quaternion));
+  return _uv.y;
 }
 
 /* =================================================================== INPUT */
@@ -1248,8 +1525,9 @@ function startRace(){
   el('garage').style.display = 'none';
   el('hud').style.display = 'block';
   el('results').style.display = 'none';
+  resetProps();                        // a fresh run gets a fresh track
   spawnAt(0);
-  S.mode = 'count'; S.countT = 2.99; S.raceT = 0;
+  S.mode = 'count'; S.countT = 2.99; S.raceT = 0; S.shake = 0;
   S.lastCpIdx = 0; S.cps = [false,false,false];
   S.prog = 0; S.lastProg = 0; S.sectionIdx = -1;
 }
@@ -1287,15 +1565,28 @@ function step(dt){
 
     const thr = racing ? (S.auto ? S.auto.thr : (K('w','arrowup') ? 1 : 0)) : 0;
     const rev = racing ? (K('s','arrowdown') ? 1 : 0) : 0;
-    const brake = racing && K(' ') ? T.brakeForce : 0;
+    const brake = (racing && (S.auto ? S.auto.brk : K(' '))) ? T.brakeForce : 0;
     const force = S.stats.power / Math.max(1, vehicle.wheelInfos.length);
 
+    let offSum = 0;
     for (let i = 0; i < vehicle.wheelInfos.length; i++) {
       const wi = vehicle.wheelInfos[i];
       vehicle.setSteeringValue(wi.userData && wi.userData.steers ? S.steer*authority : 0, i);
       vehicle.applyEngineForce(thr ? -force : (rev ? force*0.45 : 0), i);
-      vehicle.setBrake(brake, i);
+
+      // Per-wheel surface. Two wheels on the dirt drags and pulls you sideways;
+      // it's a real cost for cutting a corner, and it's felt through the wheel
+      // that's actually off, not applied to the car as a whole.
+      let off = 0;
+      if (wi.isInContact) {
+        const h = wi.raycastResult.hitPointWorld;
+        off = smoothstep(HALFW - 0.4, HALFW + 2.6, nearestOnTrack(h.x, h.z).d);
+      }
+      wi.offRoad = off; offSum += off;
+      wi.frictionSlip = T.frictionSlip * lerp(1, T.offRoadGrip, off);
+      vehicle.setBrake(brake + off * T.offRoadBrake, i);
     }
+    S.offRoad = offSum / Math.max(1, vehicle.wheelInfos.length);
 
     // Aero drag. RaycastVehicle models none, so without this every build
     // accelerates forever and the straight cannot test power against weight.
@@ -1326,13 +1617,35 @@ function step(dt){
     S.sectionIdx = SECTIONS.findIndex(s => S.prog >= s.a && S.prog < s.b);
 
     if (p.y < -25) { S.dead = true; S.deadT = 0; el('msg').style.opacity = 1; el('msg').textContent = 'OFF THE WORLD — [R]'; }
+
+    // On your roof and going nowhere. Without this you sit upside down forever
+    // unless you happen to know about [R].
+    if (chassisUpY() < 0.32 && S.speed < 1.6) S.stuckT += dt; else S.stuckT = 0;
+    if (S.stuckT > 2.2 && !S.dead) {
+      S.dead = true; S.deadT = 0;
+      el('msg').style.opacity = 1; el('msg').textContent = 'ON YOUR ROOF — [R]';
+    }
   }
-  if (S.dead) { S.deadT += dt; if (S.deadT > 1.4) respawn(); }
+  if (S.dead) { S.deadT += dt; if (S.deadT > 1.6) respawn(); }
 }
 
 /* ================================================================= PRESENT */
 const camPos = new THREE.Vector3(), camAim = new THREE.Vector3(), tmpV = new THREE.Vector3();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _cv = new CANNON.Vec3();
+const _mid = new THREE.Vector3(), _dir = new THREE.Vector3(), _UP = new THREE.Vector3(0,1,0);
 let camInit = false;
+
+// Stretch a unit-height, centre-origin mesh so it spans A to B.
+function spanTo(mesh, A, B){
+  _dir.set(B.x - A.x, B.y - A.y, B.z - A.z);
+  const len = _dir.length();
+  if (len < 1e-4) { mesh.visible = false; return; }
+  mesh.visible = true;
+  _mid.set((A.x+B.x)*0.5, (A.y+B.y)*0.5, (A.z+B.z)*0.5);
+  mesh.position.copy(_mid);
+  mesh.quaternion.setFromUnitVectors(_UP, _dir.divideScalar(len));
+  mesh.scale.set(1, len, 1);
+}
 
 // Sky rides the camera and the grit drifts regardless of mode.
 function atmos(dt){
@@ -1340,6 +1653,7 @@ function atmos(dt){
   skyMat.uniforms.uSun.value.copy(SUN_OFF).normalize();
   updateMotes(dt);
   updateDust(dt);
+  updateSparks(dt);
 }
 
 function present(dt){
@@ -1361,7 +1675,18 @@ function present(dt){
     const t = vehicle.wheelInfos[i].worldTransform;
     wheelMeshes[i].position.copy(t.position);
     wheelMeshes[i].quaternion.copy(t.quaternion);
+
+    // Span the shock from its chassis mount to the hub, and the arm from
+    // inboard to the hub. Both stretch as the suspension travels.
+    const L = linkages[i];
+    chassisBody.pointToWorldFrame(new CANNON.Vec3(L.mount.x, L.mount.y, L.mount.z), _cv);
+    _a.set(_cv.x, _cv.y, _cv.z);
+    chassisBody.pointToWorldFrame(new CANNON.Vec3(L.root.x, L.root.y, L.root.z), _cv);
+    _b.set(_cv.x, _cv.y, _cv.z);
+    spanTo(L.shock, _a, t.position);
+    spanTo(L.arm, _b, t.position);
   }
+  for (const d of dynProps) if (!d.body.sleepState) syncProp(d);   // 0 = AWAKE
 
   // Chase cam follows travel direction when moving, nose direction when not.
   const back = new THREE.Vector3(0,0,-1).applyQuaternion(chassisGroup.quaternion);
@@ -1371,6 +1696,14 @@ function present(dt){
   camPos.copy(chassisGroup.position).addScaledVector(dir, -dist).add(tmpV.set(0, 3.4 + Math.min(S.speed*0.03, 1.4), 0));
   if (!camInit) { camera.position.copy(camPos); camInit = true; }
   camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
+  // Shake after the lerp so it never gets smoothed away, and decays fast.
+  S.shake = Math.max(0, S.shake - dt*2.6);
+  if (S.shake > 0.001) {
+    const k = S.shake*S.shake*0.85;
+    camera.position.x += (Math.random()-.5)*k;
+    camera.position.y += (Math.random()-.5)*k;
+    camera.position.z += (Math.random()-.5)*k;
+  }
   camAim.copy(chassisGroup.position).add(tmpV.set(0, 1.1, 0));
   camera.lookAt(camAim);
   const wantFov = 62 + Math.min(S.speed*0.42, 15);
@@ -1434,8 +1767,16 @@ setInterval(() => {
 
 /* =================================================================== DEBUG */
 window.__dbg = {
-  S, T, PARTS, PRESETS, CANNON, world, THREE,
-  veh: () => vehicle, chassis: () => chassisBody, hf: () => hfBody,
+  S, T, PARTS, PRESETS, CANNON, world, THREE, camera, scene, dynProps,
+  veh: () => vehicle, chassis: () => chassisBody, hf: () => hfBody, links: () => linkages,
+  // Free camera for inspection: skips present() so the chase cam can't stomp it.
+  look(from, at){
+    camera.position.set(from[0], from[1], from[2]);
+    camera.lookAt(at[0], at[1], at[2]);
+    camera.updateProjectionMatrix();
+    fitCanvas(); composer.render();
+    return canvas.toDataURL('image/jpeg', 0.85);
+  },
   stats: () => S.stats,
   preset(name){ S.cells = PRESETS[name](); refresh(); return S.stats; },
   go(){ startRace(); return S.mode; },
@@ -1447,7 +1788,7 @@ window.__dbg = {
       mode:S.mode, t:+S.raceT.toFixed(2), speed:+S.speed.toFixed(2),
       kmh:Math.round(S.speed*3.6), prog:+S.prog.toFixed(3),
       pos:[+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)],
-      steer:+S.steer.toFixed(2), dead:S.dead,
+      steer:+S.steer.toFixed(2), dead:S.dead, offRoad:+S.offRoad.toFixed(2),
       section: SECTIONS[S.sectionIdx] ? SECTIONS[S.sectionIdx].name : '—',
       wheelsDown: vehicle ? vehicle.wheelInfos.filter(w => w.isInContact).length : 0,
       mass: S.stats && S.stats.mass, inertia: S.stats && S.stats.I && S.stats.I.toArray().map(n => +n.toFixed(1)),
@@ -1487,18 +1828,27 @@ window.__dbg = {
   // corner ahead is sharper than the current speed can hold. Verifies a whole
   // lap without a human, and is the seed for AI opponents.
   auto(frames, opts = {}){
-    const look = opts.look || 16, gain = opts.gain || 1.9, brakeAt = opts.brakeAt || 0.55;
+    const gain = opts.gain || 2.3;
     if (S.mode === 'count') { S.mode = 'race'; S.countT = -1; S.raceT = 0; }
     let minUp = 1, offRoad = 0, worstOff = 0;
     for (let i = 0; i < frames; i++) {
       const p = chassisBody.position;
       const near = nearestOnTrack(p.x, p.z);
+      // Look further ahead the faster you go, and aim back at the centreline
+      // rather than at wherever you happen to be — otherwise it drifts wide,
+      // which now costs real time in the dirt.
+      const look = opts.look || Math.round(9 + S.speed*0.45);
       const tgt = TR.pts[(near.i + look) % NSAMP];
       let err = Math.atan2(tgt.x - p.x, tgt.z - p.z) - this.yaw();
       while (err > Math.PI) err -= 2*Math.PI;
       while (err < -Math.PI) err += 2*Math.PI;
       const steer = clamp(err*gain, -1, 1);
-      S.auto = { steer, thr: Math.abs(steer) > brakeAt && S.speed > 16 ? 0 : 1 };
+      const sharp = Math.abs(steer);
+      S.auto = {
+        steer,
+        thr: (sharp > 0.45 && S.speed > 17) ? 0 : 1,
+        brk: sharp > 0.85 && S.speed > 25,
+      };
       step(T.fixed);
       minUp = Math.min(minUp, this.up());
       if (near.d > HALFW) { offRoad++; worstOff = Math.max(worstOff, near.d); }
