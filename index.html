@@ -96,9 +96,13 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
     text-shadow:0 2px 10px rgba(0,0,0,.9);}
   #driftBar{height:4px; background:rgba(0,0,0,.55); border:1px solid var(--line);
     border-radius:2px; overflow:hidden; margin:5px 0 3px;}
-  #driftFill{display:block; height:100%; width:0%; background:var(--rust2); transition:width .06s linear;}
-  #drift.edge #driftFill{background:var(--bad);}
-  #drift.edge #driftLabel{color:var(--bad);}
+  #driftFill{display:block; height:100%; width:0%; background:#7d6f60; transition:width .06s linear;}
+  /* tier colour is the whole read — you release when it turns */
+  #drift.t1 #driftFill{background:#ffc257;} #drift.t1 #driftLabel{color:#ffc257;}
+  #drift.t2 #driftFill{background:#ff5a2a;} #drift.t2 #driftLabel{color:#ff5a2a;}
+  #drift.t3 #driftFill{background:#9fd8ff;} #drift.t3 #driftLabel{color:#9fd8ff;
+    text-shadow:0 0 12px rgba(159,216,255,.8);}
+  #drift.t3 #driftBar{border-color:#9fd8ff;}
   #driftAng{font-size:17px; font-weight:800; color:var(--ink); text-shadow:0 2px 10px rgba(0,0,0,.9);}
   #dirt{position:absolute; bottom:26px; left:50%; transform:translateX(-50%) translateX(190px);
     width:150px; text-align:center; font-size:11px; letter-spacing:.26em; font-weight:700;
@@ -223,8 +227,8 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
       <div id="rbest">BEST —</div>
       <div id="rdrifts">
         <div><b id="rdrift">0s</b><span>SIDEWAYS</span></div>
-        <div><b id="rangle">0°</b><span>BEST ANGLE</span></div>
-        <div><b id="rchain">0s</b><span>LONGEST</span></div>
+        <div><b id="rangle">0</b><span>BOOSTS</span></div>
+        <div><b id="rchain">—</b><span>BEST TIER</span></div>
       </div>
       <div class="btns">
         <button id="rAgain">RUN AGAIN</button>
@@ -307,10 +311,43 @@ const T = {
   offRoadBrake: 5.5,                   // measured: ~33% slower in the dirt than on the road
   offRoadGrip: 0.55,                   // and it's loose, so it lets go sooner
   rearGrip: 0.92,                      // rears a touch looser than fronts = natural oversteer
-  handbrakeGrip: 0.5,                  // rear grip multiplier while the lever is up
-  handbrakeForce: 9,                   // impulse on the rears — enough to drag, not to lock
-  driftMin: 11,                        // degrees of slip before it counts as a drift
-  driftHold: 34,                       // degrees where you're on the edge of losing it
+  driftMin: 11,                        // degrees of slip before the HUD calls it a drift
+  driftHold: 34,                       // degrees where a free slide is about to become a spin
+
+  // ---- Mario-Kart drift ----
+  // Mario Kart does NOT simulate a slide, and neither does this. Trying to was
+  // a dead end: cannon's lateral tyre constraint overpowers any yaw torque
+  // (21,000 N·m should spin a 336 kg·m² chassis at 62 rad/s² — it just grips),
+  // so slip always collapsed back to ~7° no matter the gains or how loose the
+  // rears were. What MK actually does: lock a direction, turn a TIGHTER arc,
+  // keep your speed, and rotate the kart VISUALLY to look sideways. You cannot
+  // spin out of it. The build still matters because the payout is an IMPULSE
+  // and a FORCE, so F=ma hands a 636kg Anvil about half of what a 312kg Tower
+  // gets from the identical spark.
+  mk: {
+    minSpeed: 9,          // m/s to be allowed to start one
+    hop: 3.4,             // m/s of pop, purely so the entry has a beat
+    armT: 0.4,            // seconds after the hop you may still pick a direction
+    turnBoost: 1.45,      // steering authority multiplier — a drift turns tighter
+    wide: 0.5,            // steer OUT of the drift: this much lock
+    tight: 1.0,           // steer INTO it: this much
+    visAngle: 26,         // degrees the body is rotated to look sideways
+    visRange: 9,          // +/- with your steering
+    visLerp: 6.5,         // how fast the visual angle chases
+    rearGrip: 0.8,        // slight rear looseness — for dust, not for the angle
+    // A tight arc scrubs speed hard (measured 62 -> 24 km/h across two seconds
+    // of full lock). MK drifts cost you nothing, which is the entire reason you
+    // hold one, so push back along the nose. N per kg = mass-neutral; the build
+    // gets its say through the boost impulse and force instead.
+    // NOTE: exact retention is hard to measure — a sustained full-lock circle
+    // leaves the road, so the off-road penalty contaminates any bench test.
+    // This holds speed through a real corner; tune by feel.
+    assist: 6,
+    tiers: [0.85, 1.9, 3.1],          // seconds held to reach tier 1 / 2 / 3
+    kick:  [0, 2200, 3300, 4600],     // N·s impulse — Δv = J/m, so mass matters
+    force: [0, 2600, 4000, 5600],     // N sustained — a = F/m, likewise
+    dur:   [0, 0.75, 1.2, 1.7],
+  },
   // Cannon's tyres have no self-aligning torque, so a slide just keeps rotating
   // until the car is backwards. A spin is a RATE problem, not an angle problem:
   // damp the yaw rate once you're past driftHold, don't push on the angle.
@@ -338,6 +375,9 @@ const S = {
   speed:0, dead:false, deadT:0, stuckT:0, sectionIdx:-1, offRoad:0, shake:0,
   stats:null, steer:0, throttle:0, brake:0, thr:0, handbrake:false, lastCd:9,
   slip:0, drifting:false, driftT:0, driftMeter:0, driftTotal:0, maxSlip:0, bestChain:0,
+  // Mario-Kart drift state machine
+  mk: { on:false, dir:0, charge:0, tier:0, armed:false, armT:0 },
+  spacePrev:false, boostT:0, boostTier:0, boostsFired:0, bestTier:0,
   auto:null,                            // set by __dbg.auto() to drive the car headlessly
 };
 const key = (x,y,z) => x+','+y+','+z;
@@ -510,8 +550,17 @@ sun.shadow.camera.top = 46; sun.shadow.camera.bottom = -46;
 sun.shadow.camera.far = 260;
 sun.shadow.bias = -0.0015;
 scene.add(sun); scene.add(sun.target);
-// Bounce is dust-coloured from below, sickly pale from above — not blue sky.
-scene.add(new THREE.HemisphereLight(0xd8c9a8, 0x5a4326, 0.55));
+
+// THE thing that stops it reading flat: warm light, COOL shadow. Everything was
+// lit warm AND shadowed warm, so the whole frame was one ochre note with no
+// separation. Real golden hour has a cold sky filling the shade — so the
+// hemisphere's sky term goes cool (it's the sky) and its ground term stays warm
+// (that's dust bouncing up), and a dim blue fill comes from the anti-sun side
+// to put colour into everything the sun can't reach.
+scene.add(new THREE.HemisphereLight(0x8ba8d8, 0x7a5530, 0.5));
+const fill = new THREE.DirectionalLight(0x6f8fd0, 0.5);   // enough for separation, not a bleach
+fill.position.set(70, 34, -40);
+scene.add(fill);
 
 /* -------------------------------------------------------------------- sky */
 const skyMat = new THREE.ShaderMaterial({
@@ -1968,6 +2017,8 @@ function startRace(){
   S.lastCpIdx = 0; S.cps = [false,false,false];
   S.prog = 0; S.lastProg = 0; S.sectionIdx = -1;
   S.driftTotal = 0; S.maxSlip = 0; S.bestChain = 0; S.driftMeter = 0; S.driftT = 0;
+  S.mk = { on:false, dir:0, charge:0, tier:0, armed:false, armT:0 };
+  S.spacePrev = false; S.boostT = 0; S.boostTier = 0; S.boostsFired = 0; S.bestTier = 0;
 }
 function finish(){
   S.mode = 'done';
@@ -1975,8 +2026,8 @@ function finish(){
   el('rtime').textContent = S.raceT.toFixed(2);
   el('rbest').textContent = 'BEST ' + S.bestT.toFixed(2);
   el('rdrift').textContent = S.driftTotal.toFixed(1) + 's';
-  el('rangle').textContent = Math.round(S.maxSlip) + '°';
-  el('rchain').textContent = S.bestChain.toFixed(1) + 's';
+  el('rangle').textContent = S.boostsFired;
+  el('rchain').textContent = ['—','MINI','SUPER','ULTRA'][S.bestTier];
   el('results').style.display = 'flex';
   Sound.silence(); Sound.chime();
 }
@@ -1993,6 +2044,82 @@ el('btnSettings').onclick = openSettings;
 el('setClose').onclick = closeSettings;
 el('settings').onclick = e => { if (e.target === el('settings')) closeSettings(); };
 
+/* ------------------------------------------------------- Mario-Kart drift */
+const tierFor = c => (c >= T.mk.tiers[2] ? 3 : c >= T.mk.tiers[1] ? 2 : c >= T.mk.tiers[0] ? 1 : 0);
+const TIER_COL = [0xffb45a, 0xffc257, 0xff5a2a, 0x9fd8ff];   // idle, 1 amber, 2 red, 3 white-blue
+
+function fireBoost(){
+  const tier = S.mk.tier;
+  if (tier > 0) {
+    // Impulse, not a velocity set: Δv = J/m, so a heavy machine gets less.
+    const y = bodyYaw(), J = T.mk.kick[tier];
+    chassisBody.velocity.x += Math.sin(y) * J / S.stats.mass;
+    chassisBody.velocity.z += Math.cos(y) * J / S.stats.mass;
+    S.boostT = T.mk.dur[tier]; S.boostTier = tier;
+    S.boostsFired++; S.bestTier = Math.max(S.bestTier, tier);
+    Sound.beep(300 + tier*140, 0.22, 0.2, 'sawtooth');
+    const p = chassisBody.position;
+    spawnSparks(p.x, p.y - 0.3, p.z, 14 + tier*8, 0.8 + tier*0.1);
+  }
+  S.mk.on = false; S.mk.charge = 0; S.mk.tier = 0; S.mk.dir = 0;
+}
+
+// Returns whether the rears should be loosened this frame.
+function updateMKDrift(dt, racing, steerWant){
+  const M = T.mk;
+  const space = racing && !S.auto && K(' ');
+  const down = space && !S.spacePrev, up = !space && S.spacePrev;
+  S.spacePrev = space;
+
+  if (!racing) { S.mk.on = false; S.mk.armed = false; S.mk.charge = 0; S.mk.tier = 0; return false; }
+
+  // Hop. Arms the drift for a moment so you can pick a direction after it.
+  if (down && !S.mk.on && S.speed > M.minSpeed) {
+    chassisBody.velocity.y += M.hop;
+    S.mk.armed = true; S.mk.armT = M.armT;
+    Sound.beep(620, 0.06, 0.13, 'triangle');
+  }
+  if (S.mk.armed) {
+    S.mk.armT -= dt;
+    if (!space || S.mk.armT <= 0) S.mk.armed = false;
+    else if (Math.abs(steerWant) > 0.25) {          // committed — lock it in
+      S.mk.on = true; S.mk.armed = false;
+      S.mk.dir = Math.sign(steerWant); S.mk.charge = 0; S.mk.tier = 0;
+    }
+  }
+
+  if (S.mk.on) {
+    if (up || S.speed < M.minSpeed*0.6 || chassisUpY() < 0.4) { fireBoost(); return false; }
+    const y = bodyYaw(), f = M.assist * S.stats.mass;
+    chassisBody.applyForce(new CANNON.Vec3(Math.sin(y)*f, 0, Math.cos(y)*f));
+    S.mk.charge += dt;
+    S.mk.tier = tierFor(S.mk.charge);
+    return true;
+  }
+  return false;
+}
+
+// While drifting you're committed to one direction; your steering only chooses
+// how tight. Returns the steer command to use instead of raw input.
+function mkSteer(want){
+  const M = T.mk;
+  if (!S.mk.on) return want;
+  const inward = clamp(want * S.mk.dir, -1, 1);          // +1 = steering into it
+  const t = inward*0.5 + 0.5;                             // 0 = out, 1 = in
+  return S.mk.dir * (M.wide + (M.tight - M.wide)*t);
+}
+// The sideways look. Chased rather than snapped so entry and exit read.
+function mkVisual(dt, want){
+  const M = T.mk;
+  let target = 0;
+  if (S.mk.on) {
+    const inward = clamp(want * S.mk.dir, -1, 1);
+    target = S.mk.dir * (M.visAngle + inward*M.visRange) * Math.PI/180;
+  }
+  S.mk.vis = (S.mk.vis || 0) + (target - (S.mk.vis || 0)) * Math.min(1, dt*M.visLerp);
+  return S.mk.vis;
+}
+
 /* ==================================================================== STEP */
 function step(dt){
   if (S.mode === 'count') {
@@ -2006,21 +2133,23 @@ function step(dt){
     S.speed = Math.hypot(v.x, v.z);
 
     const want = racing ? (S.auto ? S.auto.steer : (K('a','arrowleft') ? 1 : 0) - (K('d','arrowright') ? 1 : 0)) : 0;
-    S.steer += clamp(want - S.steer, -T.steerRate*dt, T.steerRate*dt);
+    S.rawWant = want;
+    const cmd = mkSteer(want);
+    S.steer += clamp(cmd - S.steer, -T.steerRate*dt, T.steerRate*dt);
     // The bot is tuned against raw authority; only a human gets the setting.
     const sens = S.auto ? 1 : SETTINGS.steer;
-    const authority = (T.maxSteer * sens) / (1 + S.speed*T.steerFalloff);
+    const authority = (T.maxSteer * sens * (S.mk.on ? T.mk.turnBoost : 1)) / (1 + S.speed*T.steerFalloff);
 
     const thr = racing ? (S.auto ? S.auto.thr : (K('w','arrowup') ? 1 : 0)) : 0;
     S.thr = thr;
     // S is brake while you're moving forward, reverse once you've stopped.
-    const sKey = racing && !S.auto && K('s','arrowdown');
+    // The bot brakes through this too — Space is the handbrake now, so if
+    // auto.brk isn't wired here the autopilot drives with no brakes at all.
+    const sKey = racing && (S.auto ? S.auto.brk : K('s','arrowdown'));
     const fwd = fwdSpeed();
     const footBrake = (sKey && fwd > 1.5) ? T.brakeForce : 0;
-    const rev = (sKey && fwd <= 1.5) ? 1 : 0;
-    // Space is the HANDBRAKE, not a general brake: it drags the rears and takes
-    // their grip away, which is how you make a heavy thing rotate.
-    const hb = racing && (S.auto ? S.auto.brk : K(' '));
+    const rev = (!S.auto && sKey && fwd <= 1.5) ? 1 : 0;
+    const hb = updateMKDrift(dt, racing, want);
     S.handbrake = hb;
     const force = S.stats.power / Math.max(1, vehicle.wheelInfos.length);
 
@@ -2042,23 +2171,31 @@ function step(dt){
       wi.offRoad = off; offSum += off;
 
       let grip = lerp(1, T.offRoadGrip, off) * (ud.rear ? T.rearGrip : 1);
-      let brakeF = footBrake + off*T.offRoadBrake;
-      if (hb) {
-        if (ud.rear) { grip *= T.handbrakeGrip; brakeF += T.handbrakeForce; }
-        else brakeF += T.handbrakeForce*0.2;
-      }
+      // Loosening the rears during a drift is for looks and dust — the yaw
+      // controller owns the angle. No brake: MK drifts don't cost you speed.
+      if (hb && ud.rear) grip *= T.mk.rearGrip;
       wi.frictionSlip = T.frictionSlip * grip;
-      vehicle.setBrake(brakeF, i);
+      vehicle.setBrake(footBrake + off*T.offRoadBrake, i);
     }
     S.offRoad = offSum / Math.max(1, vehicle.wheelInfos.length);
 
     // Anti-spin: bleed the yaw RATE once the slide is past the hold angle, so
     // the tyres get a chance to bite again. Ramps in with how far past you are,
     // so a normal drift is untouched and only a genuine spin gets caught.
+    // Skipped while a MK drift is running — the drift controller owns the angle
+    // and these two would just fight each other.
     const sl = slipDeg(), aSl = Math.abs(sl);
-    if (racing && aSl > T.driftHold && S.speed > 6) {
+    if (racing && !S.mk.on && aSl > T.driftHold && S.speed > 6) {
       const excess = clamp((aSl - T.driftHold) / T.spinCap, 0, 1);
       chassisBody.torque.y -= chassisBody.angularVelocity.y * excess * T.antiSpin;
+    }
+
+    // Mini-turbo burn. A force, so a heavy build accelerates less on it.
+    if (S.boostT > 0) {
+      S.boostT -= dt;
+      const y = bodyYaw(), F = T.mk.force[S.boostTier];
+      chassisBody.applyForce(new CANNON.Vec3(Math.sin(y)*F, 0, Math.cos(y)*F));
+      if (S.boostT <= 0) S.boostTier = 0;
     }
 
     // Aero drag. RaycastVehicle models none, so without this every build
@@ -2243,12 +2380,28 @@ function present(dt){
   el('sectName').textContent = sec ? sec.name : '—';
   el('sectTest').textContent = sec ? sec.test : '';
 
-  const dr = el('drift'), ang = Math.abs(S.slip);
-  dr.classList.toggle('on', S.drifting);
-  dr.classList.toggle('edge', ang > T.driftHold);
-  el('driftFill').style.width = (S.driftMeter*100).toFixed(0) + '%';
-  el('driftAng').textContent = Math.round(ang) + '°';
+  const dr = el('drift');
+  dr.classList.toggle('on', S.mk.on || S.boostT > 0);
+  dr.className = dr.className.replace(/ ?t[0-3]\b/g, '');
+  const shownTier = S.boostT > 0 ? S.boostTier : S.mk.tier;
+  dr.classList.add('t' + shownTier);
+  el('driftFill').style.width = Math.min(100, (S.mk.charge / T.mk.tiers[2])*100).toFixed(0) + '%';
+  el('driftLabel').textContent = S.boostT > 0 ? 'BOOST' : ['DRIFT','MINI','SUPER','ULTRA'][S.mk.tier];
+  el('driftAng').textContent = Math.round(Math.abs(S.slip)) + '°';
   el('dirt').classList.toggle('on', S.offRoad > 0.35 && S.speed > 4);
+
+  // Sparks off the rear contact patches, colour-coded to the tier — this IS the
+  // read: you release when it turns.
+  spkMat.uniforms.uCol.value.setHex(TIER_COL[shownTier]);
+  if (S.mk.on && S.mk.tier > 0) {
+    for (const wi of vehicle.wheelInfos) {
+      if (!wi.isInContact || !(wi.userData && wi.userData.rear)) continue;
+      if (Math.random() < dt*34*S.mk.tier) {
+        const h = wi.raycastResult.hitPointWorld;
+        spawnSparks(h.x, h.y + 0.1, h.z, 1, 0.35 + S.mk.tier*0.16);
+      }
+    }
+  }
 
   // Audio. skidInfo is 1 at full grip; the rears let go under the handbrake, so
   // this tracks the drift for free.
@@ -2268,7 +2421,27 @@ function present(dt){
   else if (S.countT > -0.6) { S.countT -= dt; cd.textContent = 'GO'; cd.style.opacity = Math.max(0, 1 + S.countT/0.6); }
   else cd.style.opacity = 0;
 
+  // Applied LAST, after the camera has taken its bearings from the real body —
+  // otherwise the chase cam swings out with the fake angle and you get seasick.
+  applyDriftVisual(dt);
+
   atmos(dt);
+}
+
+const _dq = new THREE.Quaternion(), _dc = new THREE.Vector3();
+function applyDriftVisual(dt){
+  const ang = mkVisual(dt, S.rawWant || 0);
+  if (Math.abs(ang) < 0.002) return;
+  _dq.setFromAxisAngle(_UP, ang);
+  _dc.set(chassisBody.position.x, chassisBody.position.y, chassisBody.position.z);
+  // Everything here lives in world space, so spin it about the car's own centre.
+  const rot = o => {
+    o.position.sub(_dc).applyQuaternion(_dq).add(_dc);
+    o.quaternion.premultiply(_dq);
+  };
+  rot(chassisGroup);
+  for (const m of wheelMeshes) rot(m);
+  for (const l of linkages) { if (l.shock.visible) rot(l.shock); if (l.arm.visible) rot(l.arm); }
 }
 
 /* ==================================================================== LOOP */
