@@ -80,6 +80,10 @@ No build step, no dependencies to install — one HTML file, Three.js and cannon
 python -m http.server 5771
 ```
 
+## Deploying
+
+The Vercel project is connected to this repo: **pushing to `main` deploys to production.** No CLI step needed.
+
 ## Debug handle
 
 `window.__dbg` is live in the console:
