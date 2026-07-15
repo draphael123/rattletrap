@@ -315,34 +315,47 @@ const T = {
   driftHold: 34,                       // degrees where a free slide is about to become a spin
 
   // ---- Mario-Kart drift ----
-  // Mario Kart does NOT simulate a slide, and neither does this. Trying to was
-  // a dead end: cannon's lateral tyre constraint overpowers any yaw torque
-  // (21,000 N·m should spin a 336 kg·m² chassis at 62 rad/s² — it just grips),
-  // so slip always collapsed back to ~7° no matter the gains or how loose the
-  // rears were. What MK actually does: lock a direction, turn a TIGHTER arc,
-  // keep your speed, and rotate the kart VISUALLY to look sideways. You cannot
-  // spin out of it. The build still matters because the payout is an IMPULSE
-  // and a FORCE, so F=ma hands a 636kg Anvil about half of what a 312kg Tower
-  // gets from the identical spark.
+  // MK STRUCTURE, REAL SLIDE. Earlier I concluded cannon couldn't produce a
+  // sustained slide and faked it by rotating the mesh — that conclusion was
+  // wrong, and from a broken test: I only ever loosened the REAR wheels, so the
+  // fronts kept biting at full grip and held the line. Of course it just turned.
+  // A drift is all four sliding. Measured with global grip:
+  //     x0.30 -> 51 deg sustained, 62% speed kept
+  //     x0.18 -> 34 deg sustained, 84% kept   <- this
+  //     x0.10 -> 18 deg sustained, 116% kept
+  // The build still decides the payout: the boost is an IMPULSE and a FORCE, so
+  // F=ma hands a 636kg Anvil about half of what a 312kg Tower gets.
   mk: {
     minSpeed: 9,          // m/s to be allowed to start one
     hop: 3.4,             // m/s of pop, purely so the entry has a beat
     armT: 0.4,            // seconds after the hop you may still pick a direction
-    turnBoost: 1.45,      // steering authority multiplier — a drift turns tighter
+    turnBoost: 1.35,      // steering authority multiplier while sliding
     wide: 0.5,            // steer OUT of the drift: this much lock
     tight: 1.0,           // steer INTO it: this much
-    visAngle: 26,         // degrees the body is rotated to look sideways
-    visRange: 9,          // +/- with your steering
-    visLerp: 6.5,         // how fast the visual angle chases
-    rearGrip: 0.8,        // slight rear looseness — for dust, not for the angle
-    // A tight arc scrubs speed hard (measured 62 -> 24 km/h across two seconds
-    // of full lock). MK drifts cost you nothing, which is the entire reason you
-    // hold one, so push back along the nose. N per kg = mass-neutral; the build
-    // gets its say through the boost impulse and force instead.
-    // NOTE: exact retention is hard to measure — a sustained full-lock circle
-    // leaves the road, so the off-road penalty contaminates any bench test.
-    // This holds speed through a real corner; tune by feel.
-    assist: 6,
+    // HOW THE SLIDE IS PRODUCED — read this before touching it.
+    // Three approaches failed, all for the same reason: cannon's tyres always
+    // re-align the velocity to the nose.
+    //   1. yaw torque, rears loose  -> slip collapses to ~7 deg (fronts hold)
+    //   2. yaw torque, all loose    -> the car PLOWS (nothing can rotate it)
+    //   3. grip cut + anti-spin     -> slip SPIKES to -60 then collapses to +5,
+    //      because rate-damping and a steady drift are incompatible: a drift
+    //      needs the nose rotating continuously to track a circling velocity.
+    // So the velocity vector is steered DIRECTLY, which is what arcade racers
+    // do. The car really does travel at an angle to its nose (not a mesh trick),
+    // the angle is exactly controllable, it cannot spin, and speed is preserved
+    // by construction because we only rotate the vector, never scale it.
+    // ALL FOUR go loose while drifting. Not to create the angle (the velocity
+    // steering does that) but so the tyres do not FIGHT it: at full grip they
+    // resist the commanded direction, which scrubs 63->28 km/h in half a second
+    // and rolls the car onto its side.
+    grip: 0.14,
+    base: 24,             // degrees of slide the drift holds
+    range: 10,            // +/- as you steer within it
+    slipRate: 2.6,        // rad/s the velocity angle chases the target — entry/exit feel
+    // Loose tyres can't put POWER down either — the engine force goes through
+    // the same friction — so a drift coasts and dies without this. Applied to
+    // the body directly, bypassing the tyres. N/kg, so mass-neutral.
+    assist: 7,
     tiers: [0.85, 1.9, 3.1],          // seconds held to reach tier 1 / 2 / 3
     kick:  [0, 2200, 3300, 4600],     // N·s impulse — Δv = J/m, so mass matters
     force: [0, 2600, 4000, 5600],     // N sustained — a = F/m, likewise
@@ -2090,13 +2103,40 @@ function updateMKDrift(dt, racing, steerWant){
 
   if (S.mk.on) {
     if (up || S.speed < M.minSpeed*0.6 || chassisUpY() < 0.4) { fireBoost(); return false; }
-    const y = bodyYaw(), f = M.assist * S.stats.mass;
-    chassisBody.applyForce(new CANNON.Vec3(Math.sin(y)*f, 0, Math.cos(y)*f));
+
+    // The angle we want; APPLIED AFTER world.step() (see driftSteerVelocity).
+    // Doing it here would be pointless: the friction solver runs inside step()
+    // and re-aligns the velocity to the nose before anything ever renders.
+    const inward = clamp(steerWant * S.mk.dir, -1, 1);
+    S.mk.target = -S.mk.dir * (M.base + inward*M.range) * Math.PI/180;
+    if (M.assist) {
+      const y = bodyYaw(), f = M.assist * S.stats.mass;
+      chassisBody.applyForce(new CANNON.Vec3(Math.sin(y)*f, 0, Math.cos(y)*f));
+    }
     S.mk.charge += dt;
     S.mk.tier = tierFor(S.mk.charge);
     return true;
   }
   return false;
+}
+
+// Runs AFTER world.step(), which is the whole trick. Cannon's friction solver
+// re-aligns the velocity to the nose every step, so any rotation applied before
+// step() is silently undone inside it — that's why four earlier attempts all
+// saw slip spike and collapse back to ~5 degrees. Applied here it survives.
+// Rotating a vector can't change its length, so this costs no speed: exactly
+// the Mario Kart property we want.
+function driftSteerVelocity(dt){
+  if (!S.mk.on || !chassisBody) return;
+  const v = chassisBody.velocity;
+  const sp = Math.hypot(v.x, v.z);
+  if (sp < 3) return;
+  const cur = Math.atan2(v.x, v.z);
+  let dA = (bodyYaw() + (S.mk.target || 0)) - cur;
+  while (dA > Math.PI) dA -= 2*Math.PI;
+  while (dA < -Math.PI) dA += 2*Math.PI;
+  const na = cur + clamp(dA, -T.mk.slipRate*dt, T.mk.slipRate*dt);
+  v.x = Math.sin(na)*sp; v.z = Math.cos(na)*sp;
 }
 
 // While drifting you're committed to one direction; your steering only chooses
@@ -2108,17 +2148,9 @@ function mkSteer(want){
   const t = inward*0.5 + 0.5;                             // 0 = out, 1 = in
   return S.mk.dir * (M.wide + (M.tight - M.wide)*t);
 }
-// The sideways look. Chased rather than snapped so entry and exit read.
-function mkVisual(dt, want){
-  const M = T.mk;
-  let target = 0;
-  if (S.mk.on) {
-    const inward = clamp(want * S.mk.dir, -1, 1);
-    target = S.mk.dir * (M.visAngle + inward*M.visRange) * Math.PI/180;
-  }
-  S.mk.vis = (S.mk.vis || 0) + (target - (S.mk.vis || 0)) * Math.min(1, dt*M.visLerp);
-  return S.mk.vis;
-}
+// (There used to be a mkVisual() here that rotated the mesh to fake a slide
+// while the physics drove straight. The car now actually slides, so the lie is
+// gone — what you see is where the car is.)
 
 /* ==================================================================== STEP */
 function step(dt){
@@ -2171,9 +2203,7 @@ function step(dt){
       wi.offRoad = off; offSum += off;
 
       let grip = lerp(1, T.offRoadGrip, off) * (ud.rear ? T.rearGrip : 1);
-      // Loosening the rears during a drift is for looks and dust — the yaw
-      // controller owns the angle. No brake: MK drifts don't cost you speed.
-      if (hb && ud.rear) grip *= T.mk.rearGrip;
+      if (hb) grip *= T.mk.grip;   // all four — so they don't fight the commanded angle
       wi.frictionSlip = T.frictionSlip * grip;
       vehicle.setBrake(footBrake + off*T.offRoadBrake, i);
     }
@@ -2182,8 +2212,13 @@ function step(dt){
     // Anti-spin: bleed the yaw RATE once the slide is past the hold angle, so
     // the tyres get a chance to bite again. Ramps in with how far past you are,
     // so a normal drift is untouched and only a genuine spin gets caught.
-    // Skipped while a MK drift is running — the drift controller owns the angle
-    // and these two would just fight each other.
+    // Runs during drifts too. It used to be skipped because the old yaw
+    // controller owned the angle — then that controller was replaced and this
+    // never came back, so holding a drift swapped ends at -104 degrees. THIS is
+    // what made drifting feel wrong. During a drift it clamps at the (wider)
+    // hold angle, so you get a big slide that cannot become a spin.
+    // Skipped during a drift: the drift sets the angle outright and cannot
+    // spin, so rate-damping here would only fight it.
     const sl = slipDeg(), aSl = Math.abs(sl);
     if (racing && !S.mk.on && aSl > T.driftHold && S.speed > 6) {
       const excess = clamp((aSl - T.driftHold) / T.spinCap, 0, 1);
@@ -2209,6 +2244,7 @@ function step(dt){
   }
 
   world.step(T.fixed, dt, 3);
+  driftSteerVelocity(dt);
 
   if (S.mode === 'race' && !S.dead) {
     S.raceT += dt;
@@ -2421,27 +2457,7 @@ function present(dt){
   else if (S.countT > -0.6) { S.countT -= dt; cd.textContent = 'GO'; cd.style.opacity = Math.max(0, 1 + S.countT/0.6); }
   else cd.style.opacity = 0;
 
-  // Applied LAST, after the camera has taken its bearings from the real body —
-  // otherwise the chase cam swings out with the fake angle and you get seasick.
-  applyDriftVisual(dt);
-
   atmos(dt);
-}
-
-const _dq = new THREE.Quaternion(), _dc = new THREE.Vector3();
-function applyDriftVisual(dt){
-  const ang = mkVisual(dt, S.rawWant || 0);
-  if (Math.abs(ang) < 0.002) return;
-  _dq.setFromAxisAngle(_UP, ang);
-  _dc.set(chassisBody.position.x, chassisBody.position.y, chassisBody.position.z);
-  // Everything here lives in world space, so spin it about the car's own centre.
-  const rot = o => {
-    o.position.sub(_dc).applyQuaternion(_dq).add(_dc);
-    o.quaternion.premultiply(_dq);
-  };
-  rot(chassisGroup);
-  for (const m of wheelMeshes) rot(m);
-  for (const l of linkages) { if (l.shock.visible) rot(l.shock); if (l.arm.visible) rot(l.arm); }
 }
 
 /* ==================================================================== LOOP */
