@@ -61,18 +61,20 @@ Build it, name it, keep it. Saved machines live in your browser and load back wi
 
 ## Drift
 
-Yank the handbrake and the rears let go — that's how you rotate something heavy through a tight corner instead of scrubbing it all off on the brakes.
+Hold `Shift` into a corner and the machine locks into a slide. Steer within it — into the drift to tighten, out to run wide. Hold it and the sparks go amber, then red, then white-blue. Let go on white-blue and it fires.
 
-There's **no boost**. Drifting isn't a currency you spend, it's just how you drive. The meter is feedback, not a payout.
+The car really does travel at an angle to its nose; it isn't a mesh trick. Getting there took five attempts, and the answer was one line: **cannon's friction solver runs inside `world.step()` and re-aligns the velocity to the nose every frame**, so everything applied before the step was erased before it rendered. The velocity is steered *after* the step, with the tyres loosened so they don't fight it. Rotating a vector can't change its length, so a drift costs no speed — which is exactly the point of one.
 
-Cannon's tyres have no self-aligning torque, so a slide would rotate forever until the car was backwards (verified: 129° and still going). Past the hold angle, the yaw *rate* gets damped — a spin is a rate problem, not an angle problem. It isn't scaled by inertia, so a heavy machine is genuinely harder to catch.
+Your build still decides the payout. The boost is an impulse and a force, so `F = ma` gives the 392 kg BRICK **+36 km/h** off an ULTRA and the 636 kg ANVIL **+21**. Same spark, different machine.
 
 ## Controls
 
 | | |
 |---|---|
 | **Garage** | Click place · Right-click remove · Drag orbit · Scroll zoom · `1`–`4` pick part |
-| **Driving** | `W` throttle · `S` brake / reverse · `A`/`D` steer · `Space` **handbrake** · `R` respawn |
+| **Driving** | `W` throttle · `S` brake / reverse · `A`/`D` steer · **`Shift` drift** · `R` respawn |
+
+`Shift` + a direction locks a drift. Hold it to charge — amber, red, white-blue — and let go for the mini-turbo. (`Space` works too, if that's where your thumb goes.)
 
 Wheels ahead of the balance point steer. They're the ones tinted blue.
 

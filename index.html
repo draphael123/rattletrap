@@ -186,8 +186,11 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
   #introBtns button.alt{background:rgba(36,29,24,.85); border-color:var(--line); color:var(--dim);
     padding:16px 26px;}
   #introBtns button.alt:hover{border-color:var(--rust2); color:var(--ink); background:rgba(36,29,24,.95);}
-  #introFoot{margin-top:34px; font-size:10px; letter-spacing:.22em; color:#7d6f60;}
-  #introFoot span{color:var(--dim);}
+  #introKeys{margin-top:22px; display:flex; flex-wrap:wrap; gap:14px; align-items:center;
+    font-size:9px; letter-spacing:.1em; color:#7d6f60;}
+  #introKeys span{display:flex; align-items:center; gap:4px;}
+  #introKeys .hi{color:var(--rust2);}
+  #introKeys .hi kbd{border-color:var(--rust); color:var(--rust2); background:rgba(180,85,31,.15);}
 
   /* ---------- SETTINGS ---------- */
   #settings{position:absolute; inset:0; z-index:4; display:none; align-items:center;
@@ -298,6 +301,13 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
       <div id="introBtns">
         <button id="btnDrive">DRIVE</button>
         <button id="btnSettings" class="alt">SETTINGS</button>
+      </div>
+      <div id="introKeys">
+        <span><kbd>W</kbd> throttle</span>
+        <span><kbd>A</kbd><kbd>D</kbd> steer</span>
+        <span><kbd>S</kbd> brake</span>
+        <span class="hi"><kbd>SHIFT</kbd> drift</span>
+        <span><kbd>R</kbd> respawn</span>
       </div>
     </div>
   </div>
@@ -2380,7 +2390,9 @@ function fireBoost(){
 // Returns whether the rears should be loosened this frame.
 function updateMKDrift(dt, racing, steerWant){
   const M = T.mk;
-  const space = racing && !S.auto && K(' ');
+  // SHIFT is the drift button. Space stays bound as an alias so nobody who
+  // reaches for it is left wondering.
+  const space = racing && !S.auto && K('shift', ' ');
   const down = space && !S.spacePrev, up = !space && S.spacePrev;
   S.spacePrev = space;
 
