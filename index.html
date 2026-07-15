@@ -88,6 +88,23 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
   #sect{position:absolute; top:14px; left:14px; padding:9px 13px; font-size:11px; letter-spacing:.12em;}
   #sectName{color:var(--rust2); font-weight:700;}
   #sectTest{color:var(--dim); font-size:10px; letter-spacing:.03em; margin-top:3px;}
+  /* drift readout — feedback only, there is no boost to earn */
+  #drift{position:absolute; bottom:26px; left:50%; transform:translateX(-50%) translateX(-190px);
+    width:150px; text-align:center; opacity:0; transition:opacity .12s;}
+  #drift.on{opacity:1;}
+  #driftLabel{font-size:10px; letter-spacing:.34em; color:var(--rust2); font-weight:700;
+    text-shadow:0 2px 10px rgba(0,0,0,.9);}
+  #driftBar{height:4px; background:rgba(0,0,0,.55); border:1px solid var(--line);
+    border-radius:2px; overflow:hidden; margin:5px 0 3px;}
+  #driftFill{display:block; height:100%; width:0%; background:var(--rust2); transition:width .06s linear;}
+  #drift.edge #driftFill{background:var(--bad);}
+  #drift.edge #driftLabel{color:var(--bad);}
+  #driftAng{font-size:17px; font-weight:800; color:var(--ink); text-shadow:0 2px 10px rgba(0,0,0,.9);}
+  #dirt{position:absolute; bottom:26px; left:50%; transform:translateX(-50%) translateX(190px);
+    width:150px; text-align:center; font-size:11px; letter-spacing:.26em; font-weight:700;
+    color:var(--bad); opacity:0; transition:opacity .15s; text-shadow:0 2px 10px rgba(0,0,0,.9);}
+  #dirt.on{opacity:1;}
+
   #cd{position:absolute; top:42%; left:50%; transform:translate(-50%,-50%);
     font-size:104px; font-weight:800; color:var(--rust2); text-shadow:0 0 40px rgba(224,118,44,.5); opacity:0;}
   #msg{position:absolute; top:56%; left:50%; transform:translate(-50%,-50%);
@@ -102,12 +119,57 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
   #rcard{padding:32px 44px; text-align:center; min-width:330px;}
   #rcard h1{color:var(--good); margin-bottom:6px;}
   #rtime{font-size:46px; font-weight:800; margin:16px 0 4px;}
-  #rbest{font-size:11px; color:var(--dim); letter-spacing:.14em; margin-bottom:22px;}
+  #rbest{font-size:11px; color:var(--dim); letter-spacing:.14em; margin-bottom:18px;}
+  #rdrifts{display:flex; gap:20px; justify-content:center; margin-bottom:22px;
+    padding:10px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  #rdrifts div{display:flex; flex-direction:column; gap:3px;}
+  #rdrifts b{font-size:17px; color:var(--rust2);}
+  #rdrifts span{font-size:8px; letter-spacing:.16em; color:var(--dim);}
   #rcard .btns{display:flex; gap:8px; justify-content:center;}
   #rcard button{background:var(--rust); border:1px solid var(--rust2); color:#fff; cursor:pointer;
     padding:12px 22px; border-radius:3px; font:inherit; font-size:11px; letter-spacing:.16em; font-weight:700;}
   #rcard button.alt{background:#241d18; border-color:var(--line); color:var(--dim);}
   #rcard button:hover{filter:brightness(1.15);}
+
+  /* ---------- INTRO ---------- */
+  #intro{position:absolute; inset:0; z-index:3; display:flex; align-items:center;
+    justify-content:flex-start; padding-left:9vw;
+    background:linear-gradient(90deg, rgba(16,9,3,.82) 0%, rgba(16,9,3,.45) 45%, rgba(16,9,3,0) 78%);}
+  #introInner{max-width:520px;}
+  #introTitle{font-size:clamp(38px,7vw,74px); letter-spacing:.16em; line-height:1;
+    color:#f0c88a; text-shadow:0 0 40px rgba(224,118,44,.35), 0 4px 0 rgba(0,0,0,.5);}
+  #introTag{font-size:11px; letter-spacing:.42em; margin-top:10px; color:var(--rust2);}
+  #introBlurb{margin-top:26px; font-size:12px; line-height:2; color:#cbbaa6; letter-spacing:.04em;}
+  #introBtns{margin-top:32px; display:flex; gap:10px;}
+  #introBtns button{background:var(--rust); border:1px solid var(--rust2); color:#fff; cursor:pointer;
+    padding:16px 40px; border-radius:4px; font:inherit; font-size:13px; font-weight:800;
+    letter-spacing:.24em; transition:.14s;}
+  #introBtns button:hover{background:var(--rust2); transform:translateY(-1px);}
+  #introBtns button.alt{background:rgba(36,29,24,.85); border-color:var(--line); color:var(--dim);
+    padding:16px 26px;}
+  #introBtns button.alt:hover{border-color:var(--rust2); color:var(--ink); background:rgba(36,29,24,.95);}
+  #introFoot{margin-top:34px; font-size:10px; letter-spacing:.22em; color:#7d6f60;}
+  #introFoot span{color:var(--dim);}
+
+  /* ---------- SETTINGS ---------- */
+  #settings{position:absolute; inset:0; z-index:4; display:none; align-items:center;
+    justify-content:center; background:rgba(10,6,2,.78);}
+  #setCard{padding:28px 34px; min-width:400px;}
+  #setCard h1{font-size:18px;}
+  #setCard .sub{margin-bottom:18px;}
+  .setRow{display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:9px 0; border-bottom:1px solid rgba(255,255,255,.05);}
+  .setRow label{font-size:11px; letter-spacing:.1em; color:var(--dim); flex:0 0 150px; text-align:left;}
+  .setRow input[type=range]{flex:1; accent-color:var(--rust2); cursor:pointer;}
+  .setRow .val{flex:0 0 44px; text-align:right; font-size:11px; font-weight:700; color:var(--ink);}
+  .setSeg{display:flex; gap:4px; flex:1;}
+  .setSeg button{flex:1; background:#241d18; border:1px solid var(--line); color:var(--dim);
+    cursor:pointer; padding:6px 4px; border-radius:3px; font:inherit; font-size:9px; letter-spacing:.08em;}
+  .setSeg button.on{background:var(--rust); border-color:var(--rust2); color:#fff;}
+  #setCard .btns{display:flex; justify-content:center; margin-top:20px;}
+  #setCard .btns button{background:var(--rust); border:1px solid var(--rust2); color:#fff;
+    cursor:pointer; padding:11px 30px; border-radius:3px; font:inherit; font-size:11px;
+    letter-spacing:.18em; font-weight:700;}
 
   #boot{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     background:var(--dark); z-index:50; flex-direction:column; gap:10px;}
@@ -143,6 +205,12 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
     <div id="times" class="panel"><div id="clock">0.00</div><div id="best">BEST —</div></div>
     <button id="back">◀ GARAGE</button>
     <div id="speedo"><div id="spd">0</div><div id="spdu">KM/H</div></div>
+    <div id="drift">
+      <div id="driftLabel">DRIFT</div>
+      <div id="driftBar"><i id="driftFill"></i></div>
+      <div id="driftAng">0°</div>
+    </div>
+    <div id="dirt">OFF ROAD</div>
     <div id="cd"></div>
     <div id="msg"></div>
   </div>
@@ -153,10 +221,41 @@ window.addEventListener('unhandledrejection', e => { window.__err = String((e.re
       <div class="sub">IT HELD TOGETHER</div>
       <div id="rtime">0.00</div>
       <div id="rbest">BEST —</div>
+      <div id="rdrifts">
+        <div><b id="rdrift">0s</b><span>SIDEWAYS</span></div>
+        <div><b id="rangle">0°</b><span>BEST ANGLE</span></div>
+        <div><b id="rchain">0s</b><span>LONGEST</span></div>
+      </div>
       <div class="btns">
         <button id="rAgain">RUN AGAIN</button>
         <button id="rGarage" class="alt">BACK TO GARAGE</button>
       </div>
+    </div>
+  </div>
+
+  <div id="intro">
+    <div id="introInner">
+      <h1 id="introTitle">RATTLETRAP</h1>
+      <div class="sub" id="introTag">BUILD IT · THEN LIVE WITH IT</div>
+      <div id="introBlurb">
+        Weld a machine together out of what the world left behind.<br>
+        Nothing about how it drives is decided by a stat. It's decided by<br>
+        where you put the weight.
+      </div>
+      <div id="introBtns">
+        <button id="btnDrive">DRIVE</button>
+        <button id="btnSettings" class="alt">SETTINGS</button>
+      </div>
+      <div id="introFoot"><span id="introTrack">THE OLD 47</span> · <span id="introSub">MERCY COUNTY</span></div>
+    </div>
+  </div>
+
+  <div id="settings">
+    <div id="setCard" class="panel">
+      <h1>SETTINGS</h1>
+      <div class="sub">TUNE IT TO TASTE</div>
+      <div id="setRows"></div>
+      <div class="btns"><button id="setClose">DONE</button></div>
     </div>
   </div>
 
@@ -207,6 +306,18 @@ const T = {
   // ~13 per wheel here. Anything near that number is a parking brake, not mud.
   offRoadBrake: 5.5,                   // measured: ~33% slower in the dirt than on the road
   offRoadGrip: 0.55,                   // and it's loose, so it lets go sooner
+  rearGrip: 0.92,                      // rears a touch looser than fronts = natural oversteer
+  handbrakeGrip: 0.5,                  // rear grip multiplier while the lever is up
+  handbrakeForce: 9,                   // impulse on the rears — enough to drag, not to lock
+  driftMin: 11,                        // degrees of slip before it counts as a drift
+  driftHold: 34,                       // degrees where you're on the edge of losing it
+  // Cannon's tyres have no self-aligning torque, so a slide just keeps rotating
+  // until the car is backwards. A spin is a RATE problem, not an angle problem:
+  // damp the yaw rate once you're past driftHold, don't push on the angle.
+  // NOT scaled by inertia — a heavy machine is genuinely harder to catch, which
+  // is the whole point of the game.
+  antiSpin: 9000,                      // N·m per rad/s of yaw, at full excess
+  spinCap: 26,                         // degrees past driftHold for full strength
   maxSteer: 0.52, steerFalloff: 0.05, steerRate: 3.4,
   fixed: 1 / 60,
 };
@@ -225,11 +336,150 @@ const S = {
   raceT:0, bestT:null, countT:0,
   prog:0, lastProg:0, cps:[false,false,false], lastCpIdx:0,
   speed:0, dead:false, deadT:0, stuckT:0, sectionIdx:-1, offRoad:0, shake:0,
-  stats:null, steer:0, throttle:0, brake:0,
+  stats:null, steer:0, throttle:0, brake:0, thr:0, handbrake:false, lastCd:9,
+  slip:0, drifting:false, driftT:0, driftMeter:0, driftTotal:0, maxSlip:0, bestChain:0,
   auto:null,                            // set by __dbg.auto() to drive the car headlessly
 };
 const key = (x,y,z) => x+','+y+','+z;
 const unkey = k => k.split(',').map(Number);
+
+/* ================================================================= SETTINGS */
+const SET_DEFAULTS = { steer:1.0, shake:1.0, fx:'high', camFx:true, master:0.9, sfx:0.85 };
+const SETTINGS = Object.assign({}, SET_DEFAULTS);
+try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem('rattletrap.settings') || '{}')); } catch (e) {}
+const saveSettings = () => { try { localStorage.setItem('rattletrap.settings', JSON.stringify(SETTINGS)); } catch (e) {} };
+
+/* ==================================================================== SOUND */
+// Fully synthesised — no files to license, host or wait on, and it stays a
+// single deployable page. Every method guards on `ctx`, so audio can never be
+// the reason the game breaks.
+const Sound = (() => {
+  let ctx = null, master, musicG, sfxG;
+  let eng = null, skid = null, wind = null, grit = null;
+  let vol = { master: 0.9, sfx: 0.85, music: 0.5 };
+
+  const noiseBuf = () => {
+    const b = ctx.createBuffer(1, ctx.sampleRate*2, ctx.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+    return b;
+  };
+  const loopNoise = (type, freq, Q, gain) => {
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf(); src.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = type; f.frequency.value = freq; if (Q) f.Q.value = Q;
+    const g = ctx.createGain(); g.gain.value = gain;
+    src.connect(f); f.connect(g); g.connect(sfxG);
+    src.start();
+    return { src, f, g };
+  };
+
+  function init(){
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+    master = ctx.createGain(); master.gain.value = vol.master; master.connect(ctx.destination);
+    musicG = ctx.createGain(); musicG.gain.value = vol.music; musicG.connect(master);
+    sfxG = ctx.createGain(); sfxG.gain.value = vol.sfx; sfxG.connect(master);
+
+    // Engine: three detuned saws through a lowpass, plus a slow amplitude chug
+    // so it sounds like something welded together rather than a synth pad.
+    const oscs = [], mix = ctx.createGain();
+    mix.gain.value = 0;
+    for (const det of [-9, 0, 7]) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth'; o.frequency.value = 60; o.detune.value = det;
+      o.connect(mix); o.start();
+      oscs.push(o);
+    }
+    const sub = ctx.createOscillator();
+    sub.type = 'square'; sub.frequency.value = 30; sub.connect(mix); sub.start();
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 600; lp.Q.value = 4;
+    const eg = ctx.createGain(); eg.gain.value = 0;
+    mix.connect(lp); lp.connect(eg); eg.connect(sfxG);
+    // chug
+    const lfo = ctx.createOscillator(), lfoG = ctx.createGain();
+    lfo.type = 'sine'; lfo.frequency.value = 11; lfoG.gain.value = 0.25;
+    lfo.connect(lfoG); lfoG.connect(eg.gain); lfo.start();
+    eng = { oscs, sub, lp, eg, lfo };
+
+    skid = loopNoise('bandpass', 1800, 3.5, 0);
+    grit = loopNoise('bandpass', 700, 1.4, 0);
+    wind = loopNoise('lowpass', 500, 0, 0);
+  }
+
+  // A fake 4-speed. The pitch rising and dropping on the shift is most of what
+  // makes an engine read as an engine.
+  const GEARS = [[0, 9], [7, 17], [14, 26], [22, 40]];
+  function drive(speed, throttle, offRoad){
+    if (!ctx || !eng) return;
+    let g = 0;
+    for (let i = 0; i < GEARS.length; i++) if (speed >= GEARS[i][0]) g = i;
+    const [lo, hi] = GEARS[g];
+    const rpm = clamp((speed - lo) / (hi - lo), 0, 1.15);
+    const base = 46 + rpm*104 + (throttle ? 10 : 0);
+    const t = ctx.currentTime;
+    for (const o of eng.oscs) o.frequency.setTargetAtTime(base, t, 0.05);
+    eng.sub.frequency.setTargetAtTime(base*0.5, t, 0.05);
+    eng.lp.frequency.setTargetAtTime(380 + rpm*2100 + (throttle ? 500 : 0), t, 0.06);
+    eng.eg.gain.setTargetAtTime(0.13 + rpm*0.1 + (throttle ? 0.07 : 0), t, 0.07);
+    eng.lfo.frequency.setTargetAtTime(8 + rpm*26, t, 0.1);
+    wind.g.gain.setTargetAtTime(Math.min(0.14, speed*0.005), t, 0.15);
+    wind.f.frequency.setTargetAtTime(300 + speed*22, t, 0.15);
+    grit.g.gain.setTargetAtTime(offRoad * Math.min(0.16, speed*0.006), t, 0.1);
+  }
+  function setSkid(amount){
+    if (!ctx || !skid) return;
+    skid.g.gain.setTargetAtTime(Math.min(0.2, amount*0.2), ctx.currentTime, 0.05);
+    skid.f.frequency.setTargetAtTime(1300 + amount*1400, ctx.currentTime, 0.08);
+  }
+  function thud(power){
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(150*power + 40, t);
+    o.frequency.exponentialRampToValueAtTime(35, t + 0.18);
+    g.gain.setValueAtTime(Math.min(0.5, 0.16 + power*0.42), t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    o.connect(g); g.connect(sfxG); o.start(t); o.stop(t + 0.32);
+    const n = ctx.createBufferSource(); n.buffer = noiseBuf();
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900 + power*2600; f.Q.value = 1.1;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(Math.min(0.42, power*0.4), t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    n.connect(f); f.connect(ng); ng.connect(sfxG); n.start(t); n.stop(t + 0.22);
+  }
+  function beep(freq, dur, gain = 0.2, type = 'square'){
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(sfxG); o.start(t); o.stop(t + dur + 0.02);
+  }
+  function chime(){
+    if (!ctx) return;
+    [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, 0.35, 0.16, 'triangle'), i*85));
+  }
+  function silence(){
+    if (!ctx || !eng) return;
+    const t = ctx.currentTime;
+    eng.eg.gain.setTargetAtTime(0, t, 0.1);
+    skid.g.gain.setTargetAtTime(0, t, 0.1);
+    wind.g.gain.setTargetAtTime(0, t, 0.1);
+    grit.g.gain.setTargetAtTime(0, t, 0.1);
+  }
+  function setVol(which, v){
+    vol[which] = v;
+    if (!ctx) return;
+    ({ master, sfx: sfxG, music: musicG })[which].gain.setTargetAtTime(v, ctx.currentTime, 0.03);
+  }
+  return { init, drive, setSkid, thud, beep, chime, silence, setVol, vol, ready: () => !!ctx };
+})();
 
 /* ------------------------------------------------------------------ render */
 const canvas = document.getElementById('c');
@@ -518,8 +768,10 @@ const SECTIONS = [
   { a:0.31, b:0.46, name:'THE WASHBOARD',  test:'short wheelbases bounce' },
   { a:0.46, b:0.64, name:'THE RAMP',       test:'nose-heavy lands nose-first' },
   { a:0.64, b:0.84, name:'THE OFF-CAMBER', test:'tall builds roll' },
-  { a:0.84, b:1.00, name:'RUN HOME',       test:'' },
+  { a:0.84, b:1.00, name:'MERCY',          test:'what\'s left of the town' },
 ];
+const TRACK_NAME = 'THE OLD 47';
+const TRACK_SUB  = 'MERCY COUNTY · 850m · ONE LAP';
 const HALFW = 5.2, SHOULDER = 5.5, NSAMP = 480;
 
 const curve = new THREE.CatmullRomCurve3(CP.map(([x,z]) => new THREE.Vector3(x,0,z)), true, 'catmullrom', 0.5);
@@ -917,7 +1169,8 @@ const rustMat = (c, r = 0.92) => new THREE.MeshStandardMaterial({ color:c, rough
     const t = k/(COUNT-1);
     const x = lerp(A.x, B.x, t), z = lerp(A.y, B.y, t);
     const near = nearestOnTrack(x, z);
-    const y = near.d < HALFW+SHOULDER ? roadElev(near.i/NSAMP, TR.cum[near.i]) : terrainBase(x, z);
+    if (near.d < HALFW + 3.5) { tops.push(null); continue; }   // never plant one in the road
+    const y = terrainBase(x, z);
     const m = new THREE.Mesh(pylonGeo, mat);
     m.position.set(x, y - 0.3, z);
     m.rotation.y = Math.atan2(B.x-A.x, B.y-A.y) + Math.PI/2;
@@ -929,7 +1182,7 @@ const rustMat = (c, r = 0.92) => new THREE.MeshStandardMaterial({ color:c, rough
   }
   const cableMat = new THREE.LineBasicMaterial({ color:0x2c241c, transparent:true, opacity:0.75 });
   for (let k = 0; k < tops.length-1; k++) {
-    if (k === 4) continue;                        // this span came down long ago
+    if (k === 4 || !tops[k] || !tops[k+1]) continue;   // downed span, or a pylon we skipped
     for (const off of [-2.2, 0, 2.2]) {
       const pts = [];
       for (let s = 0; s <= 12; s++) {
@@ -941,6 +1194,89 @@ const rustMat = (c, r = 0.92) => new THREE.MeshStandardMaterial({ color:c, rough
       trackGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), cableMat));
     }
   }
+}
+
+{ // MERCY — what's left of the town the road was built for. The buildings crowd
+  // right up to the verge, so the last stretch is a threading exercise where
+  // everywhere else has been an open plain. This is what makes the lap a place.
+  const A = 0.855, B = 0.985;
+  const conc = rustMat(0x9a8f7c, 0.97);
+  for (let i = Math.round(A*NSAMP); i < Math.round(B*NSAMP); i += 5) {
+    const p = TR.pts[i % NSAMP], nrm = TR.nrms[i % NSAMP], tan = TR.tans[i % NSAMP];
+    const frac = (i % NSAMP)/NSAMP;
+    const baseY = roadElev(frac, TR.cum[i % NSAMP]);
+    const roadYaw = Math.atan2(tan.x, tan.z);
+    for (const side of [-1, 1]) {
+      if (((i/5)|0 + (side > 0 ? 1 : 0)) % 3 === 2) continue;   // gaps: alleys and rubble
+      const dYaw = (((i*104729) % 100)/100 - 0.5)*0.4;          // turn relative to the road
+      const yaw = roadYaw + dYaw;
+      const pick = (i + (side > 0 ? 3 : 0)) % 4;
+      const s = 1.0 + ((i*7717) % 100)/100 * 0.8;
+      let geo, mat, half, cy;
+      if (pick === 0 || pick === 1) {                            // shell of a building
+        const h = 2.6 + ((i*6151) % 100)/100 * 3.2;
+        geo = new THREE.BoxGeometry(3.2, h, 3.6); mat = conc;
+        half = { x:1.6, y:h/2, z:1.8 }; cy = h/2 - 0.2;
+      } else if (pick === 2) {                                   // collapsed lean-to
+        geo = WRECKS.shack.g; mat = WRECKS.shack.mats[i % WRECKS.shack.mats.length];
+        half = { x:1.75*s, y:1.15*s, z:1.5*s }; cy = 1.15*s;
+      } else {                                                   // dead car at the kerb
+        geo = WRECKS.husk.g; mat = WRECKS.husk.mats[i % WRECKS.husk.mats.length];
+        half = { x:1.05*s, y:0.72*s, z:2.3*s }; cy = 0.72*s;
+      }
+      // A rotated box reaches further sideways than its half-width: place from
+      // its ACTUAL perpendicular reach, or the town closes the road and nothing
+      // finishes the lap.
+      const perp = half.x*Math.abs(Math.cos(dYaw)) + half.z*Math.abs(Math.sin(dYaw));
+      const out = HALFW + 1.5 + perp + ((i*7919) % 100)/100 * 2.4;
+
+      const bx = p.x + nrm.x*side*out, bz = p.z + nrm.z*side*out;
+      // Offsetting from THIS segment isn't enough — the loop runs near itself,
+      // so a building placed beside one stretch can land across another.
+      if (nearestOnTrack(bx, bz).d < HALFW + 1.0 + perp) continue;
+
+      const mesh = new THREE.Mesh(geo, mat);
+      if (pick > 1) mesh.scale.setScalar(s);
+      mesh.rotation.y = yaw;
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.position.set(bx, baseY - (pick > 1 ? 0.15 : 0), bz);
+      trackGroup.add(mesh);
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
+      addStaticBox(half, { x:bx, y:baseY + cy - (pick > 1 ? 0.15 : 0), z:bz }, q);
+    }
+  }
+
+  // The water tower. Every town like this has one, and it's the thing you see
+  // from the far side of the lap telling you the line is close.
+  const ti = Math.round(0.92*NSAMP) % NSAMP;
+  const tp = TR.pts[ti], tn = TR.nrms[ti];
+  // Same trap: 16m to the side of the town lands squarely on the home straight,
+  // because the loop doubles back here. Search outward for a spot that is clear
+  // of EVERY part of the track.
+  let tx, tz;
+  outer: for (const dist of [17, 23, 29, 36, 44]) {
+    for (const side of [1, -1]) {
+      const cx = tp.x + tn.x*side*dist, cz = tp.z + tn.z*side*dist;
+      if (nearestOnTrack(cx, cz).d > HALFW + 8) { tx = cx; tz = cz; break outer; }
+    }
+  }
+  if (tx === undefined) { tx = tp.x + tn.x*44; tz = tp.z + tn.z*44; }
+  const ty = terrainBase(tx, tz);
+  const legs = [];
+  for (const [lx, lz] of [[-2.2,-2.2],[2.2,-2.2],[-2.2,2.2],[2.2,2.2]])
+    legs.push(gBox(0.32, 13, 0.32, lx, 6.5, lz));
+  legs.push(gBox(5.4, 0.26, 0.26, 0, 5, 0), gBox(0.26, 0.26, 5.4, 0, 5, 0));
+  legs.push(gBox(5.4, 0.26, 0.26, 0, 9.5, 0), gBox(0.26, 0.26, 5.4, 0, 9.5, 0));
+  const tower = new THREE.Mesh(mergeGeometries(legs), rustMat(0x6b5340, 0.9));
+  tower.position.set(tx, ty, tz); tower.castShadow = true;
+  trackGroup.add(tower);
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 4.4, 14), rustMat(0x8a5a34, 0.88));
+  tank.position.set(tx, ty + 15.2, tz); tank.castShadow = true;
+  trackGroup.add(tank);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(3.6, 1.5, 14), rustMat(0x6e4a2e, 0.9));
+  cap.position.set(tx, ty + 18.1, tz);
+  trackGroup.add(cap);
+  addStaticBox({ x:2.6, y:8, z:2.6 }, { x:tx, y:ty+7, z:tz }, null);
 }
 
 { // Radio masts on the skyline. Far away, tall, pointless now.
@@ -1268,7 +1604,10 @@ function buildVehicle(){
       customSlidingRotationalSpeed: -30,
       useCustomSlidingRotationalSpeed: true,
     });
-    vehicle.wheelInfos[vehicle.wheelInfos.length-1].userData = { steers: st.steerKeys.has(w.k) };
+    vehicle.wheelInfos[vehicle.wheelInfos.length-1].userData = {
+      steers: st.steerKeys.has(w.k),
+      rear: (w.p.z - st.com.z) <= 0.05,      // the handbrake only drags these
+    };
   }
   vehicle.addToWorld(world);
   chassisBody.userData = { minWheelY };
@@ -1285,6 +1624,7 @@ function buildVehicle(){
     const power = Math.min(1, imp/16);
     spawnSparks(px, py, pz, 3 + ((power*13)|0), power);
     S.shake = Math.max(S.shake, power);
+    Sound.thud(power);
   });
 
   chassisGroup = new THREE.Group();
@@ -1343,11 +1683,35 @@ function spawnAt(sampleIdx){
   S.dead = false; S.deadT = 0; S.stuckT = 0;
 }
 
-const _uq = new THREE.Quaternion(), _uv = new THREE.Vector3();
+const _uq = new THREE.Quaternion(), _uv = new THREE.Vector3(), _ye = new THREE.Euler();
 function chassisUpY(){
   if (!chassisBody) return 1;
   _uv.set(0, 1, 0).applyQuaternion(_uq.copy(chassisBody.quaternion));
   return _uv.y;
+}
+function bodyYaw(){
+  if (!chassisBody) return 0;
+  _ye.setFromQuaternion(_uq.copy(chassisBody.quaternion), 'YXZ');
+  return _ye.y;
+}
+// Angle between where the nose points and where the car is actually going.
+// This IS the drift — everything else is presentation.
+function slipDeg(){
+  if (!chassisBody) return 0;
+  const v = chassisBody.velocity;
+  const sp = Math.hypot(v.x, v.z);
+  if (sp < 2.5) return 0;
+  let d = Math.atan2(v.x, v.z) - bodyYaw();
+  while (d > Math.PI) d -= 2*Math.PI;
+  while (d < -Math.PI) d += 2*Math.PI;
+  if (Math.abs(d) > Math.PI/2) return 0;      // reversing / spun, not drifting
+  return d * 180/Math.PI;
+}
+// Signed forward speed, for deciding whether S means brake or reverse.
+function fwdSpeed(){
+  if (!chassisBody) return 0;
+  const y = bodyYaw(), v = chassisBody.velocity;
+  return v.x*Math.sin(y) + v.z*Math.cos(y);
 }
 
 /* =================================================================== INPUT */
@@ -1504,8 +1868,79 @@ for (const name in PRESETS) {
 
 /* ==================================================================== FLOW */
 const el = id => document.getElementById(id);
+
+/* ------------------------------------------------------- settings panel UI */
+function buildSettings(){
+  const rows = el('setRows');
+  const slider = (label, keyName, min, max, step, fmt, onChange) => {
+    const r = document.createElement('div'); r.className = 'setRow';
+    r.innerHTML = `<label>${label}</label><input type="range" min="${min}" max="${max}" step="${step}"><span class="val"></span>`;
+    const inp = r.querySelector('input'), val = r.querySelector('.val');
+    inp.value = SETTINGS[keyName];
+    val.textContent = fmt(SETTINGS[keyName]);
+    inp.oninput = () => {
+      SETTINGS[keyName] = parseFloat(inp.value);
+      val.textContent = fmt(SETTINGS[keyName]);
+      if (onChange) onChange(SETTINGS[keyName]);
+      saveSettings();
+    };
+    rows.appendChild(r);
+  };
+  const seg = (label, keyName, opts, onChange) => {
+    const r = document.createElement('div'); r.className = 'setRow';
+    r.innerHTML = `<label>${label}</label><div class="setSeg"></div>`;
+    const wrap = r.querySelector('.setSeg');
+    opts.forEach(([v, txt]) => {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      b.classList.toggle('on', SETTINGS[keyName] === v);
+      b.onclick = () => {
+        SETTINGS[keyName] = v;
+        [...wrap.children].forEach(c => c.classList.remove('on'));
+        b.classList.add('on');
+        if (onChange) onChange(v);
+        saveSettings();
+      };
+      wrap.appendChild(b);
+    });
+    rows.appendChild(r);
+  };
+  const pct = v => Math.round(v*100) + '%';
+  slider('STEERING', 'steer', 0.4, 1.8, 0.05, pct);
+  slider('CAMERA SHAKE', 'shake', 0, 2, 0.05, pct);
+  seg('EFFECTS', 'fx', [['high','HIGH'],['low','LOW']], applyFx);
+  seg('CAMERA MOTION', 'camFx', [[true,'ON'],[false,'OFF']]);
+  slider('MASTER VOLUME', 'master', 0, 1, 0.05, pct, v => Sound.setVol('master', v));
+  slider('ENGINE / SFX', 'sfx', 0, 1, 0.05, pct, v => Sound.setVol('sfx', v));
+}
+// Low turns off the expensive per-pixel work and thins the particles.
+function applyFx(v){
+  bloomPass.enabled = v === 'high';
+  motes.visible = v === 'high';
+  renderer.shadowMap.enabled = v === 'high';
+  scene.traverse(o => { if (o.isMesh && o.material) o.material.needsUpdate = true; });
+}
+function openSettings(){ el('settings').style.display = 'flex'; }
+function closeSettings(){ el('settings').style.display = 'none'; }
+
+function showIntro(){
+  S.mode = 'intro';
+  Sound.silence();
+  el('intro').style.display = 'flex';
+  el('garage').style.display = 'none';
+  el('hud').style.display = 'none';
+  el('results').style.display = 'none';
+  garageRig.visible = false; buildGroup.visible = false;
+  trackGroup.visible = true;
+  if (chassisGroup) chassisGroup.visible = false;
+  wheelMeshes.forEach(m => m.visible = false);
+  linkages.forEach(l => { l.shock.visible = false; l.arm.visible = false; });
+}
+
 function showGarage(){
   S.mode = 'garage';
+  Sound.silence();
+  el('intro').style.display = 'none';
   el('garage').style.display = 'block';
   el('hud').style.display = 'none';
   el('results').style.display = 'none';
@@ -1517,26 +1952,33 @@ function showGarage(){
 }
 function startRace(){
   if (!S.stats || !S.stats.drivable) return;
+  Sound.init();                        // must be inside the click gesture
   buildVehicle();
   garageRig.visible = false; buildGroup.visible = false;
   trackGroup.visible = true;
   chassisGroup.visible = true;
   wheelMeshes.forEach(m => m.visible = true);
+  el('intro').style.display = 'none';
   el('garage').style.display = 'none';
   el('hud').style.display = 'block';
   el('results').style.display = 'none';
   resetProps();                        // a fresh run gets a fresh track
   spawnAt(0);
-  S.mode = 'count'; S.countT = 2.99; S.raceT = 0; S.shake = 0;
+  S.mode = 'count'; S.countT = 2.99; S.raceT = 0; S.shake = 0; S.lastCd = 9;
   S.lastCpIdx = 0; S.cps = [false,false,false];
   S.prog = 0; S.lastProg = 0; S.sectionIdx = -1;
+  S.driftTotal = 0; S.maxSlip = 0; S.bestChain = 0; S.driftMeter = 0; S.driftT = 0;
 }
 function finish(){
   S.mode = 'done';
   if (S.bestT === null || S.raceT < S.bestT) S.bestT = S.raceT;
   el('rtime').textContent = S.raceT.toFixed(2);
   el('rbest').textContent = 'BEST ' + S.bestT.toFixed(2);
+  el('rdrift').textContent = S.driftTotal.toFixed(1) + 's';
+  el('rangle').textContent = Math.round(S.maxSlip) + '°';
+  el('rchain').textContent = S.bestChain.toFixed(1) + 's';
   el('results').style.display = 'flex';
+  Sound.silence(); Sound.chime();
 }
 function respawn(){
   spawnAt(S.lastCpIdx);
@@ -1546,6 +1988,10 @@ el('gGo').onclick = startRace;
 el('back').onclick = showGarage;
 el('rGarage').onclick = showGarage;
 el('rAgain').onclick = startRace;
+el('btnDrive').onclick = () => { Sound.init(); Sound.beep(320, 0.1, 0.18); showGarage(); };
+el('btnSettings').onclick = openSettings;
+el('setClose').onclick = closeSettings;
+el('settings').onclick = e => { if (e.target === el('settings')) closeSettings(); };
 
 /* ==================================================================== STEP */
 function step(dt){
@@ -1561,17 +2007,28 @@ function step(dt){
 
     const want = racing ? (S.auto ? S.auto.steer : (K('a','arrowleft') ? 1 : 0) - (K('d','arrowright') ? 1 : 0)) : 0;
     S.steer += clamp(want - S.steer, -T.steerRate*dt, T.steerRate*dt);
-    const authority = T.maxSteer / (1 + S.speed*T.steerFalloff);
+    // The bot is tuned against raw authority; only a human gets the setting.
+    const sens = S.auto ? 1 : SETTINGS.steer;
+    const authority = (T.maxSteer * sens) / (1 + S.speed*T.steerFalloff);
 
     const thr = racing ? (S.auto ? S.auto.thr : (K('w','arrowup') ? 1 : 0)) : 0;
-    const rev = racing ? (K('s','arrowdown') ? 1 : 0) : 0;
-    const brake = (racing && (S.auto ? S.auto.brk : K(' '))) ? T.brakeForce : 0;
+    S.thr = thr;
+    // S is brake while you're moving forward, reverse once you've stopped.
+    const sKey = racing && !S.auto && K('s','arrowdown');
+    const fwd = fwdSpeed();
+    const footBrake = (sKey && fwd > 1.5) ? T.brakeForce : 0;
+    const rev = (sKey && fwd <= 1.5) ? 1 : 0;
+    // Space is the HANDBRAKE, not a general brake: it drags the rears and takes
+    // their grip away, which is how you make a heavy thing rotate.
+    const hb = racing && (S.auto ? S.auto.brk : K(' '));
+    S.handbrake = hb;
     const force = S.stats.power / Math.max(1, vehicle.wheelInfos.length);
 
     let offSum = 0;
     for (let i = 0; i < vehicle.wheelInfos.length; i++) {
       const wi = vehicle.wheelInfos[i];
-      vehicle.setSteeringValue(wi.userData && wi.userData.steers ? S.steer*authority : 0, i);
+      const ud = wi.userData || {};
+      vehicle.setSteeringValue(ud.steers ? S.steer*authority : 0, i);
       vehicle.applyEngineForce(thr ? -force : (rev ? force*0.45 : 0), i);
 
       // Per-wheel surface. Two wheels on the dirt drags and pulls you sideways;
@@ -1583,10 +2040,26 @@ function step(dt){
         off = smoothstep(HALFW - 0.4, HALFW + 2.6, nearestOnTrack(h.x, h.z).d);
       }
       wi.offRoad = off; offSum += off;
-      wi.frictionSlip = T.frictionSlip * lerp(1, T.offRoadGrip, off);
-      vehicle.setBrake(brake + off * T.offRoadBrake, i);
+
+      let grip = lerp(1, T.offRoadGrip, off) * (ud.rear ? T.rearGrip : 1);
+      let brakeF = footBrake + off*T.offRoadBrake;
+      if (hb) {
+        if (ud.rear) { grip *= T.handbrakeGrip; brakeF += T.handbrakeForce; }
+        else brakeF += T.handbrakeForce*0.2;
+      }
+      wi.frictionSlip = T.frictionSlip * grip;
+      vehicle.setBrake(brakeF, i);
     }
     S.offRoad = offSum / Math.max(1, vehicle.wheelInfos.length);
+
+    // Anti-spin: bleed the yaw RATE once the slide is past the hold angle, so
+    // the tyres get a chance to bite again. Ramps in with how far past you are,
+    // so a normal drift is untouched and only a genuine spin gets caught.
+    const sl = slipDeg(), aSl = Math.abs(sl);
+    if (racing && aSl > T.driftHold && S.speed > 6) {
+      const excess = clamp((aSl - T.driftHold) / T.spinCap, 0, 1);
+      chassisBody.torque.y -= chassisBody.angularVelocity.y * excess * T.antiSpin;
+    }
 
     // Aero drag. RaycastVehicle models none, so without this every build
     // accelerates forever and the straight cannot test power against weight.
@@ -1602,6 +2075,27 @@ function step(dt){
 
   if (S.mode === 'race' && !S.dead) {
     S.raceT += dt;
+
+    // Drift is just: are you pointing somewhere other than where you're going,
+    // fast enough for it to matter. No boost, no payout — the reward is that
+    // rotating on the throttle is how you get a heavy machine round a tight
+    // corner without scrubbing off all your speed on the brakes.
+    S.slip = slipDeg();
+    const a = Math.abs(S.slip);
+    S.drifting = S.speed > 8 && a > T.driftMin;
+    if (S.drifting) {
+      S.driftT += dt; S.driftTotal += dt;
+      S.maxSlip = Math.max(S.maxSlip, a);
+      S.bestChain = Math.max(S.bestChain, S.driftT);
+      // Fills fastest in the sweet spot and falls off as you approach a spin.
+      const quality = clamp((a - T.driftMin) / (T.driftHold - T.driftMin), 0, 1)
+                    * (1 - smoothstep(T.driftHold, T.driftHold + 22, a));
+      S.driftMeter = clamp(S.driftMeter + dt*(0.35 + quality*0.9), 0, 1);
+    } else {
+      S.driftT = 0;
+      S.driftMeter = Math.max(0, S.driftMeter - dt*1.1);
+    }
+
     const p = chassisBody.position;
     const near = nearestOnTrack(p.x, p.z);
     S.lastProg = S.prog;
@@ -1657,6 +2151,22 @@ function atmos(dt){
 }
 
 function present(dt){
+  if (S.mode === 'intro') {
+    // Slow drift across the wasteland, framed on the town so the first thing
+    // you ever see is the place, not a menu on a black screen.
+    S.introT = (S.introT || 0) + dt*0.055;
+    const i = Math.round(0.90*NSAMP) % NSAMP;
+    const c = TR.pts[i], n = TR.nrms[i];
+    const r = 46, a = S.introT;
+    camera.position.set(c.x + Math.sin(a)*r + n.x*10, 15 + Math.sin(a*0.7)*3, c.z + Math.cos(a)*r + n.z*10);
+    camera.lookAt(c.x, 6, c.z);
+    camera.fov += (52 - camera.fov)*Math.min(1, dt*3); camera.updateProjectionMatrix();
+    sun.target.position.set(c.x, 0, c.z);
+    sun.position.set(c.x + SUN_OFF.x, SUN_OFF.y, c.z + SUN_OFF.z);
+    sun.intensity = 2.5;
+    atmos(dt);
+    return;
+  }
   if (S.mode === 'garage') {
     updateGarageCam();
     camera.fov += (62 - camera.fov)*0.2; camera.updateProjectionMatrix();
@@ -1698,15 +2208,15 @@ function present(dt){
   camera.position.lerp(camPos, 1 - Math.pow(0.0016, dt));
   // Shake after the lerp so it never gets smoothed away, and decays fast.
   S.shake = Math.max(0, S.shake - dt*2.6);
-  if (S.shake > 0.001) {
-    const k = S.shake*S.shake*0.85;
+  if (S.shake > 0.001 && SETTINGS.shake > 0) {
+    const k = S.shake*S.shake*0.85*SETTINGS.shake;
     camera.position.x += (Math.random()-.5)*k;
     camera.position.y += (Math.random()-.5)*k;
     camera.position.z += (Math.random()-.5)*k;
   }
   camAim.copy(chassisGroup.position).add(tmpV.set(0, 1.1, 0));
   camera.lookAt(camAim);
-  const wantFov = 62 + Math.min(S.speed*0.42, 15);
+  const wantFov = SETTINGS.camFx ? 62 + Math.min(S.speed*0.42, 15) : 62;
   camera.fov += (wantFov - camera.fov)*Math.min(1, dt*4);
   camera.updateProjectionMatrix();
 
@@ -1733,8 +2243,28 @@ function present(dt){
   el('sectName').textContent = sec ? sec.name : '—';
   el('sectTest').textContent = sec ? sec.test : '';
 
+  const dr = el('drift'), ang = Math.abs(S.slip);
+  dr.classList.toggle('on', S.drifting);
+  dr.classList.toggle('edge', ang > T.driftHold);
+  el('driftFill').style.width = (S.driftMeter*100).toFixed(0) + '%';
+  el('driftAng').textContent = Math.round(ang) + '°';
+  el('dirt').classList.toggle('on', S.offRoad > 0.35 && S.speed > 4);
+
+  // Audio. skidInfo is 1 at full grip; the rears let go under the handbrake, so
+  // this tracks the drift for free.
+  let skid = 0;
+  for (const wi of vehicle.wheelInfos)
+    if (wi.isInContact) skid = Math.max(skid, 1 - (wi.skidInfo === undefined ? 1 : wi.skidInfo));
+  Sound.drive(S.speed, S.thr, S.offRoad);
+  Sound.setSkid(skid * Math.min(1, S.speed/9) * (1 - S.offRoad*0.6));
+
   const cd = el('cd');
-  if (S.mode === 'count') { cd.style.opacity = 1; cd.textContent = Math.ceil(S.countT) || 'GO'; }
+  if (S.mode === 'count') {
+    cd.style.opacity = 1;
+    const n = Math.ceil(S.countT);
+    cd.textContent = n || 'GO';
+    if (n !== S.lastCd) { S.lastCd = n; Sound.beep(n ? 480 : 760, n ? 0.12 : 0.4, 0.22); }
+  }
   else if (S.countT > -0.6) { S.countT -= dt; cd.textContent = 'GO'; cd.style.opacity = Math.max(0, 1 + S.countT/0.6); }
   else cd.style.opacity = 0;
 
@@ -1862,9 +2392,17 @@ window.__dbg = {
 /* ==================================================================== BOOT */
 S.cells = PRESETS['THE BRICK']();
 setTool('frame');
-showGarage();
+refresh();
+buildSettings();
+applyFx(SETTINGS.fx);
+Sound.setVol('master', SETTINGS.master);
+Sound.setVol('sfx', SETTINGS.sfx);
+el('introTrack').textContent = TRACK_NAME;
+el('introSub').textContent = TRACK_SUB;
+el('sectTest').textContent = '';
+showIntro();
 fitCanvas();
-document.getElementById('boot').style.display = 'none';
+el('boot').style.display = 'none';
 </script>
 </body>
 </html>

@@ -40,25 +40,37 @@ Give it a 1-metre wheelbase and enough engine and it will backflip off the start
 - **Off-road costs you ~33%.** Dirt is modelled per-wheel: whichever tyres are off the road get rolling resistance and reduced grip, so putting two wheels in the sand drags *and* pulls you sideways. Cutting a corner is a real decision.
 - **Roll it and it recovers.** On your roof and stopped for two seconds and it puts you back on the last checkpoint.
 
-## The track
+## THE OLD 47
 
-Six stretches, each interrogating one decision:
+One lap, 850 m, six stretches — each interrogating one decision:
 
 - **THE STRAIGHT** — power against weight
 - **THE CHICANE** — grip and wheelbase
 - **THE WASHBOARD** — short wheelbases bounce
 - **THE RAMP** — nose-heavy lands nose-first
 - **THE OFF-CAMBER** — tall builds roll
-- **RUN HOME**
+- **MERCY** — what's left of the town the road was built for. The buildings crowd the verge and the water tower stands over it. Everywhere else is open plain; this is where you thread.
+
+## Drift
+
+Yank the handbrake and the rears let go — that's how you rotate something heavy through a tight corner instead of scrubbing it all off on the brakes.
+
+There's **no boost**. Drifting isn't a currency you spend, it's just how you drive. The meter is feedback, not a payout.
+
+Cannon's tyres have no self-aligning torque, so a slide would rotate forever until the car was backwards (verified: 129° and still going). Past the hold angle, the yaw *rate* gets damped — a spin is a rate problem, not an angle problem. It isn't scaled by inertia, so a heavy machine is genuinely harder to catch.
 
 ## Controls
 
 | | |
 |---|---|
-| **Garage** | Click to place · Right-click to remove · Drag to orbit · Scroll to zoom · `1`–`4` pick part |
-| **Driving** | `W` throttle · `S` reverse · `A`/`D` steer · `Space` brake · `R` respawn |
+| **Garage** | Click place · Right-click remove · Drag orbit · Scroll zoom · `1`–`4` pick part |
+| **Driving** | `W` throttle · `S` brake / reverse · `A`/`D` steer · `Space` **handbrake** · `R` respawn |
 
 Wheels ahead of the balance point steer. They're the ones tinted blue.
+
+## Sound
+
+Fully synthesised — no files to license, host or wait on. A fake 4-speed gearbox, because the pitch rising and dropping on the shift is most of what makes an engine read as an engine. Plus tyre skid tied to actual slip, gravel when you're off the road, wind on speed, and impacts scaled by contact force.
 
 ## Running it
 
